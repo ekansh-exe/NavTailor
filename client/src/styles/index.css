@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+/* Design tokens from CLAUDE.md. Each variable becomes Tailwind utilities:
+   --color-cream -> bg-cream / text-cream / border-cream
+   --shadow-hard -> shadow-hard
+   --font-heading -> font-heading                                         */
+@theme {
+  --color-cream: #ffffe0;
+  --color-ink: #111111;
+  /* Status colors, used only for the API health tag. */
+  --color-ok: #7be07b;
+  --color-alert: #ff5c5c;
+
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+
+  /* Remove Tailwind's defaults so soft styles cannot sneak in:
+     only shadow-hard exists, rounded-* and blur-* generate nothing. */
+  --shadow-*: initial;
+  --shadow-hard: 4px 4px 0 #111111;
+  --radius-*: initial;
+  --blur-*: initial;
+}
+
+@layer base {
+  body {
+    @apply bg-cream font-sans text-ink;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-heading font-extrabold uppercase;
+  }
+}
