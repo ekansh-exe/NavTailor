@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "warm:pdf": "node scripts/warmPdf.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

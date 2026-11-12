@@ -39,6 +39,9 @@ const id = z
   .max(LIMIT.id)
   .regex(/^[A-Za-z0-9_-]+$/, 'Use only letters, numbers, "_" and "-"');
 
+// Exported so the tailoring schemas (selection, scored items) can point at items by the same id rule.
+export const idSchema = id;
+
 // Only http(s) links, so things like "javascript:" can never get into the profile.
 const url = z.url({ protocol: /^https?$/ }).max(LIMIT.url);
 const emptyOr = (schema) => z.union([z.literal(''), schema]).default('');

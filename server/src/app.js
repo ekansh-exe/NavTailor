@@ -6,6 +6,7 @@ import { config } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { profileRouter } from './routes/profile.js';
 import { createDevRouter } from './routes/dev.js';
+import { createResumeRouter } from './routes/resume.js';
 
 export const app = express();
 
@@ -17,6 +18,8 @@ app.use(
   cors({
     origin: config.clientOrigin,
     credentials: true,
+    // Without this a browser on another port cannot read the PDF report headers (see routes/resume.js).
+    exposedHeaders: ['X-Resume-Pages', 'X-Resume-Dropped', 'X-Resume-Fit'],
   }),
 );
 
@@ -32,6 +35,9 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
+
+// Resume -> PDF / LaTeX source. Auth is applied inside the router.
+app.use('/api/resume', createResumeRouter());
 
 // Dev-only tools. In production this is never mounted, so the URL is a plain 404.
 if (!config.isProduction) {
