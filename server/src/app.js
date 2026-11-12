@@ -27,6 +27,10 @@ app.use(
 );
 
 // Parse JSON request bodies into req.body.
+// Saving an application sends the whole signed tailoring result plus the job description back, which
+// can pass the default 100 kB. Only that path gets a bigger limit. The global parser below then sees
+// the body is already parsed and skips it.
+app.use('/api/applications', express.json({ limit: '400kb' }));
 app.use(express.json());
 
 // Parse the Cookie header into req.cookies (needed to read our session cookie).

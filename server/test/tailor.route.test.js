@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { JOB_DESCRIPTION, analysis, profile } from './helpers/tailorFixtures.js';
 
+
 const TEST_SECRET = 'test-secret-that-is-only-used-in-this-test-file-0123456789';
 const userA = new mongoose.Types.ObjectId().toString();
 const userB = new mongoose.Types.ObjectId().toString();
@@ -162,7 +163,9 @@ describe('a normal run', () => {
     const res = await tailor();
     assert.equal(res.status, 200);
     for (const key of ['jdAnalysis', 'selection', 'changes', 'gapReport', 'questions', 'resume', 'warnings', 'meta']) assert.ok(key in res.json, key);
-    assert.equal(tailorResponseSchema.safeParse(res.json).success, true);
+    const { saveToken, ...result } = res.json;
+    assert.match(saveToken, /^\d+\.[a-f0-9]{64}$/, 'a save token comes with the result');
+    assert.equal(tailorResponseSchema.safeParse(result).success, true);
     assert.equal(profileSchema.safeParse(res.json.resume).success, true, 'the resume must be accepted by /api/resume/render');
   });
 
@@ -336,7 +339,9 @@ describe('failures', () => {
     assert.ok(res.json.warnings.includes('rewrite_unavailable'));
     assert.equal(res.json.meta.providers.rewrite, null);
     assert.ok(res.json.changes.every((c) => c.reason === 'no_rewrite'));
-    assert.equal(tailorResponseSchema.safeParse(res.json).success, true);
+    const { saveToken, ...result } = res.json;
+    assert.ok(saveToken);
+    assert.equal(tailorResponseSchema.safeParse(result).success, true);
   });
 
   test('an unexpected crash: 500 without the error message', async (t) => {

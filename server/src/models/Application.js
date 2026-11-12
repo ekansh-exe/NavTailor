@@ -2,13 +2,18 @@ import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
 
-// One tailoring run for one job: what the user asked for, what the pipeline produced and what the
-// user decided about each rewrite.
+// One job the user is going after: the company, the role, the job description and where they are in
+// the hiring process. The tailored resumes for it live in a SEPARATE collection (resumeVersions) and
+// point back here through applicationId.
 //
-// One user has MANY applications, so unlike Profile (one per user, embedded items) each application
-// is its own document that points at its owner through userId. Every query must include userId.
+// Why reference instead of embed: an application can collect many versions, each tens of KB. Embedded,
+// the document would grow every re-tailor (toward the 16 MB cap), and a tiny status change would
+// rewrite every resume. The dashboard never needs the resumes, so they live apart.
+//
+// One user has MANY applications, so each one points at its owner through userId. Every query must
+// include userId.
 
-export const APPLICATION_STATUSES = ['tailored', 'reviewed'];
+export const APPLICATION_STATUSES = ['saved', 'applied', 'interview', 'offer', 'rejected'];
 
 // Per-user cap, so one account cannot fill the free database tier.
 export const MAX_APPLICATIONS_PER_USER = 200;
@@ -20,27 +25,22 @@ const applicationSchema = new Schema(
 
     company: { type: String, trim: true, required: true },
     role: { type: String, trim: true, required: true },
-    jobDescription: { type: String, required: true },
+    jdText: { type: String, required: true },
 
-    // The whole pipeline output (gapReport, changes, resume, scores, ...). Mixed = Mongoose does not
-    // check its shape. That is on purpose: zod (tailorResponseSchema) already validated it before the
-    // save, and keeping one schema for it means the two cannot drift apart.
-    result: { type: Schema.Types.Mixed, required: true },
+    // Where the user is with this job. Changed from the dashboard dropdown.
+    status: { type: String, enum: APPLICATION_STATUSES, default: 'saved' },
 
-    // The user's Accept/Reject overrides: change itemId -> true (use rewrite) / false (keep original).
-    // A missing key means "the pipeline's default". A Map, because the keys are ids we do not know
-    // ahead of time.
-    decisions: { type: Map, of: Boolean, default: () => new Map() },
-
-    // tailored: just created. reviewed: the user saved decisions at least once.
-    status: { type: String, enum: APPLICATION_STATUSES, default: 'tailored' },
+    // How the profile matches THIS job description. It belongs to the job, not to a resume version,
+    // and it lives here so the dashboard can show the match score without reading any version.
+    // Mixed: zod (gapReportSchema) checked its shape before the save.
+    gapReport: { type: Schema.Types.Mixed, required: true },
   },
   { timestamps: true },
 );
 
 // Compound index for the dashboard query: find({ userId }).sort({ createdAt: -1 }).
-// MongoDB jumps to this user's entries, already in newest-first order, instead of scanning and
-// sorting the whole collection. It also serves findOne({ _id, userId }) checks via _id.
+// Equality field first, sort field second. MongoDB jumps to this user's entries, which are already
+// in newest-first order, instead of scanning and sorting the whole collection.
 applicationSchema.index({ userId: 1, createdAt: -1 });
 
 // Model name "Application" -> collection "applications".

@@ -1,5 +1,6 @@
-// Tests for /api/applications. The LLM is a fake; the profile loader is a fake; the applications
-// themselves go to a REAL throwaway in-memory MongoDB, so the userId scoping is tested for real.
+// Tests for /api/applications. A real tailoring result is made once with a fake LLM and a fake
+// profile, then signed like POST /api/tailor does. The applications and versions go to a REAL
+// throwaway in-memory MongoDB, so the userId scoping and the delete cascade are tested for real.
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
@@ -16,8 +17,10 @@ const cookieFor = (id, secret = TEST_SECRET) => `session=${jwt.sign({ sub: id },
 
 let mongod;
 let Application;
+let ResumeVersion;
 let MAX_APPLICATIONS_PER_USER;
-let tailorResponseSchema;
+let signResult;
+let tailorForUser;
 const servers = [];
 
 async function serve(app) {
@@ -45,6 +48,8 @@ const REWRITES = () => [
   { id: 'exp1_b2', text: 'Wrote Node.js services for the billing platform serving 9000 users' },
 ];
 
+
+const JD = JOB_DESCRIPTION.trim();
 let base;
 let limitedBase;
 let appBase;
@@ -58,19 +63,22 @@ before(async () => {
 
   const { createApplicationsRouter } = await import('../src/routes/applications.js');
   ({ Application, MAX_APPLICATIONS_PER_USER } = await import('../src/models/Application.js'));
-  ({ tailorResponseSchema } = await import('../src/tailor/schemas.js'));
+  ({ ResumeVersion } = await import('../src/models/ResumeVersion.js'));
+  ({ signResult } = await import('../src/tailor/saveToken.js'));
+  ({ tailorForUser } = await import('../src/tailor/forUser.js'));
   await mongoose.connect(mongod.getUri());
   await Application.init(); // builds the indexes
+  await ResumeVersion.init();
 
   const appWith = (router) => {
     const app = express();
-    app.use(express.json());
+    app.use(express.json({ limit: '400kb' }));
     app.use(cookieParser());
     app.use('/api/applications', router);
     return app;
   };
-  base = await serve(appWith(createApplicationsRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 1000 })));
-  limitedBase = await serve(appWith(createApplicationsRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 2 })));
+  base = await serve(appWith(createApplicationsRouter({ limit: 1000 })));
+  limitedBase = await serve(appWith(createApplicationsRouter({ limit: 2 })));
   const { app } = await import('../src/app.js');
   appBase = await serve(app);
 });
@@ -85,7 +93,15 @@ beforeEach(async () => {
   llmCalls = [];
   nextRewrites = REWRITES;
   await Application.deleteMany({});
+  await ResumeVersion.deleteMany({});
 });
+
+// What POST /api/tailor would have answered: a validated result plus its save token.
+async function tailored(userId = userA) {
+  const outcome = await tailorForUser({ userId, jobDescription: JD, llm: fakeLLM, loadProfile: fakeLoad });
+  assert.ok(outcome.ok);
+  return { result: outcome.data, saveToken: signResult({ userId, jdText: JD, result: outcome.data }) };
+}
 
 async function call(url, method, path, { cookie = cookieFor(userA), json } = {}) {
   const headers = {};
@@ -95,23 +111,29 @@ async function call(url, method, path, { cookie = cookieFor(userA), json } = {})
   const text = await res.text();
   return { status: res.status, text, json: text ? JSON.parse(text) : null };
 }
-const BODY = { company: 'Initech', role: 'Backend Engineer', jobDescription: JOB_DESCRIPTION };
-const create = (opts = {}, url = base) => call(url, 'POST', '', { json: BODY, ...opts });
+
+async function saveBody(overrides = {}, userId = userA) {
+  return { company: 'Initech', role: 'Backend Engineer', jdText: JD, ...(await tailored(userId)), ...overrides };
+}
+async function create({ cookie, userId = userA, json, url = base } = {}) {
+  return call(url, 'POST', '', { cookie: cookie ?? cookieFor(userId), json: json ?? (await saveBody({}, userId)) });
+}
 
 // ---------- auth ----------
 
 describe('auth', () => {
-  test('every route answers 401 without a cookie, and no LLM call is made', async () => {
+  test('every route answers 401 without a cookie', async () => {
     const id = new mongoose.Types.ObjectId().toString();
     for (const [method, path, json] of [
-      ['POST', '', BODY],
+      ['POST', '', {}],
       ['GET', '', undefined],
       ['GET', `/${id}`, undefined],
-      ['PATCH', `/${id}/decisions`, { decisions: {} }],
+      ['PATCH', `/${id}`, { status: 'applied' }],
+      ['PATCH', `/${id}/versions/${id}/decisions`, { decisions: {} }],
+      ['DELETE', `/${id}`, undefined],
     ]) {
       assert.equal((await call(base, method, path, { cookie: null, json })).status, 401, `${method} ${path}`);
     }
-    assert.equal(llmCalls.length, 0);
   });
 
   test('the real app mounts the router and protects it', async () => {
@@ -121,80 +143,113 @@ describe('auth', () => {
 
 // ---------- create ----------
 
-describe('POST /', () => {
-  test('tailors, saves for the signed-in user and returns 201 { id }', async () => {
-    const res = await create();
+describe('POST / (save from the result page)', () => {
+  test('creates one application and one version, both owned by the signed-in user', async () => {
+    llmCalls = [];
+    const json = await saveBody({ decisions: { exp1_b1: false } });
+    const callsBefore = llmCalls.length;
+    const res = await create({ json });
     assert.equal(res.status, 201);
-    assert.match(res.json.id, /^[a-f0-9]{24}$/);
-    assert.deepEqual(llmCalls, ['analyze', 'rewrite']);
+    assert.equal(llmCalls.length, callsBefore, 'saving makes no LLM call');
 
-    const doc = await Application.findById(res.json.id).lean();
-    assert.equal(String(doc.userId), userA);
-    assert.equal(doc.company, 'Initech');
-    assert.equal(doc.status, 'tailored');
-    assert.ok(tailorResponseSchema.safeParse(doc.result).success, 'the stored result matches the tailor schema');
-    assert.ok(Object.keys(doc.result.scores).length > 0, 'bullet scores are stored for /render');
+    const app = await Application.findById(res.json.id).lean();
+    assert.equal(String(app.userId), userA);
+    assert.equal(app.status, 'saved');
+    assert.equal(app.jdText, JD);
+    assert.equal(typeof app.gapReport.matchScore, 'number');
+
+    const versions = await ResumeVersion.find({ applicationId: app._id }).lean();
+    assert.equal(versions.length, 1);
+    assert.equal(String(versions[0]._id), res.json.versionId);
+    assert.equal(String(versions[0].userId), userA);
+    // The server built the resume itself, with the decision applied (original text kept).
+    const bullet = versions[0].resumeJson.experience[0].bullets.find((b) => b.id === 'exp1_b1');
+    assert.equal(bullet.text, 'Built a React dashboard used by 40 teams');
+    assert.match(versions[0].texSource, /\\begin\{document\}/);
+  });
+
+  test('a result changed after signing (an invented bullet) is refused and nothing is saved', async () => {
+    const json = await saveBody();
+    json.result.resume.experience[0].bullets[0].text = 'Led a team of 500 engineers at Google';
+    const res = await create({ json });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'bad_token');
+    assert.equal(await Application.countDocuments({}), 0);
+  });
+
+  test('a changed job description, a missing token or a junk token is refused', async () => {
+    for (const overrides of [{ jdText: `${JD} Also Rust.` }, { saveToken: '' }, { saveToken: '123.abc' }]) {
+      const res = await create({ json: await saveBody(overrides) });
+      assert.equal(res.status, 400, JSON.stringify(Object.keys(overrides)));
+    }
+    assert.equal(await Application.countDocuments({}), 0);
+  });
+
+  test("user B cannot save user A's signed result", async () => {
+    const res = await create({ cookie: cookieFor(userB), json: await saveBody({}, userA) });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'bad_token');
+  });
+
+  test('an expired token is refused with its own code', async () => {
+    const { result } = await tailored();
+    const saveToken = signResult({ userId: userA, jdText: JD, result, now: Date.now() - 3 * 60 * 60 * 1000 });
+    const res = await create({ json: await saveBody({ result, saveToken }) });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'token_expired');
+  });
+
+  test('accepting a rewrite the guardrail rejected (invented number) is refused', async () => {
+    const res = await create({ json: await saveBody({ decisions: { exp1_b2: true } }) });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'not_toggleable');
+    assert.deepEqual(res.json.itemIds, ['exp1_b2']);
   });
 
   test('a userId in the body is refused (the owner comes only from the cookie)', async () => {
-    const res = await create({ json: { ...BODY, userId: userB } });
+    const res = await create({ json: await saveBody({ userId: userB }) });
     assert.equal(res.status, 400);
     assert.equal(await Application.countDocuments({}), 0);
   });
 
-  for (const [label, json] of [
-    ['missing company', { ...BODY, company: '' }],
-    ['missing role', { ...BODY, role: '   ' }],
-    ['short job description', { ...BODY, jobDescription: 'too short' }],
-    ['huge job description', { ...BODY, jobDescription: 'x'.repeat(15_001) }],
+  for (const [label, overrides] of [
+    ['missing company', { company: '' }],
+    ['missing role', { role: '   ' }],
+    ['short job description', { jdText: 'too short' }],
   ]) {
-    test(`bad input is refused before any LLM call: ${label}`, async () => {
-      const res = await create({ json });
+    test(`bad input is refused: ${label}`, async () => {
+      const res = await create({ json: await saveBody(overrides) });
       assert.equal(res.status, 400);
       assert.equal(res.json.code, 'bad_application');
-      assert.equal(llmCalls.length, 0);
     });
   }
 
-  test('a tailoring failure is passed through and nothing is saved', async () => {
-    const { createApplicationsRouter } = await import('../src/routes/applications.js');
-    const app = express();
-    app.use(express.json());
-    app.use(cookieParser());
-    app.use('/api/applications', createApplicationsRouter({ llm: fakeLLM, loadProfile: async () => null, limit: 1000 }));
-    const res = await create({}, await serve(app));
-    assert.equal(res.status, 404);
-    assert.equal(res.json.code, 'no_profile');
-    assert.equal(await Application.countDocuments({}), 0);
-  });
-
-  test('at the per-user cap: 409 before any LLM call; another user is unaffected', async () => {
-    const result = (await Application.create({ userId: userA, company: 'c', role: 'r', jobDescription: 'j', result: {} })).result;
+  test('at the per-user cap: 409; another user is unaffected', async () => {
+    const gapReport = { matchScore: 0.5 };
     await Application.insertMany(
-      Array.from({ length: MAX_APPLICATIONS_PER_USER - 1 }, () => ({ userId: userA, company: 'c', role: 'r', jobDescription: 'j', result })),
+      Array.from({ length: MAX_APPLICATIONS_PER_USER }, () => ({ userId: userA, company: 'c', role: 'r', jdText: 'j', gapReport })),
     );
     const res = await create();
     assert.equal(res.status, 409);
     assert.equal(res.json.code, 'too_many_applications');
-    assert.equal(llmCalls.length, 0);
-    assert.equal((await create({ cookie: cookieFor(userB) })).status, 201);
+    assert.equal((await create({ userId: userB })).status, 201);
   });
 
-  test('rate limit per user: the third create gets 429, another user is unaffected', async () => {
-    assert.equal((await create({}, limitedBase)).status, 201);
-    assert.equal((await create({}, limitedBase)).status, 201);
-    assert.equal((await create({}, limitedBase)).status, 429);
-    assert.equal((await create({ cookie: cookieFor(userB) }, limitedBase)).status, 201);
+  test('rate limit per user: the third save gets 429, another user is unaffected', async () => {
+    assert.equal((await create({ url: limitedBase })).status, 201);
+    assert.equal((await create({ url: limitedBase })).status, 201);
+    assert.equal((await create({ url: limitedBase })).status, 429);
+    assert.equal((await create({ userId: userB, url: limitedBase })).status, 201);
   });
 });
 
 // ---------- read ----------
 
 describe('GET / and GET /:id', () => {
-  test('the list holds only my applications, newest first, without the heavy result', async () => {
+  test('the list holds only my applications, newest first, without any resume', async () => {
     const first = (await create()).json.id;
-    const second = (await create({ json: { ...BODY, company: 'Globex' } })).json.id;
-    await create({ cookie: cookieFor(userB), json: { ...BODY, company: 'B-ONLY' } });
+    const second = (await create({ json: await saveBody({ company: 'Globex' }) })).json.id;
+    await create({ userId: userB, json: await saveBody({ company: 'B-ONLY' }, userB) });
 
     const res = await call(base, 'GET', '');
     assert.equal(res.status, 200);
@@ -205,19 +260,29 @@ describe('GET / and GET /:id', () => {
     assert.ok(!res.text.includes('B-ONLY'));
   });
 
-  test('GET /:id returns my application with its result, and no userId', async () => {
-    const id = (await create()).json.id;
+  test('the list query uses the compound index: no in-memory SORT stage', async () => {
+    await create();
+    const plan = await Application.find({ userId: userA }).sort({ createdAt: -1 }).explain('queryPlanner');
+    const text = JSON.stringify(plan.queryPlanner.winningPlan);
+    assert.match(text, /IXSCAN/);
+    assert.match(text, /userId_1_createdAt_-1/);
+    assert.doesNotMatch(text, /"stage":"SORT"/);
+  });
+
+  test('GET /:id returns my application and its newest version, and no userId', async () => {
+    const { id, versionId } = (await create()).json;
     const res = await call(base, 'GET', `/${id}`);
     assert.equal(res.status, 200);
     assert.equal(res.json.application.id, id);
-    assert.equal(res.json.application.jobDescription, JOB_DESCRIPTION.trim());
-    assert.ok(Array.isArray(res.json.application.result.changes));
-    assert.deepEqual(res.json.application.decisions, {});
-    assert.ok(!('userId' in res.json.application));
+    assert.equal(res.json.application.jdText, JD);
+    assert.equal(res.json.version.id, versionId);
+    assert.ok(Array.isArray(res.json.version.result.changes));
+    assert.deepEqual(res.json.version.decisions, {});
+    assert.ok(!res.text.includes('userId'));
   });
 
   test("IDOR: someone else's application is a 404, exactly like one that does not exist", async () => {
-    const id = (await create()).json.id;
+    const { id } = (await create()).json;
     const theirs = await call(base, 'GET', `/${id}`, { cookie: cookieFor(userB) });
     const missing = await call(base, 'GET', `/${new mongoose.Types.ObjectId()}`, { cookie: cookieFor(userB) });
     assert.equal(theirs.status, 404);
@@ -232,42 +297,98 @@ describe('GET / and GET /:id', () => {
   });
 });
 
-// ---------- decisions ----------
+// ---------- status ----------
 
-describe('PATCH /:id/decisions', () => {
-  test('rejecting a passed rewrite is saved and the status becomes reviewed', async () => {
-    const id = (await create()).json.id;
-    const res = await call(base, 'PATCH', `/${id}/decisions`, { json: { decisions: { exp1_b1: false } } });
+describe('PATCH /:id (status)', () => {
+  test('changes the status of my application', async () => {
+    const { id } = (await create()).json;
+    const res = await call(base, 'PATCH', `/${id}`, { json: { status: 'interview' } });
     assert.equal(res.status, 200);
-    assert.deepEqual(res.json, { decisions: { exp1_b1: false }, status: 'reviewed' });
-    assert.deepEqual((await call(base, 'GET', `/${id}`)).json.application.decisions, { exp1_b1: false });
+    assert.deepEqual(res.json, { status: 'interview' });
+    assert.equal((await Application.findById(id).lean()).status, 'interview');
   });
 
-  test('a rewrite the guardrail rejected (invented number) can NOT be accepted', async () => {
-    const id = (await create()).json.id;
-    const app = (await call(base, 'GET', `/${id}`)).json.application;
-    assert.equal(app.result.changes.find((c) => c.itemId === 'exp1_b2').reason, 'new_number');
-
-    const res = await call(base, 'PATCH', `/${id}/decisions`, { json: { decisions: { exp1_b2: true } } });
-    assert.equal(res.status, 400);
-    assert.equal(res.json.code, 'not_toggleable');
-    assert.deepEqual(res.json.itemIds, ['exp1_b2']);
-    assert.equal((await Application.findById(id).lean()).status, 'tailored');
+  test('an unknown status or extra field is refused', async () => {
+    const { id } = (await create()).json;
+    for (const json of [{ status: 'hired' }, {}, { status: 'applied', company: 'Evil' }]) {
+      assert.equal((await call(base, 'PATCH', `/${id}`, { json })).status, 400, JSON.stringify(json));
+    }
+    assert.equal((await Application.findById(id).lean()).status, 'saved');
   });
 
   test("someone else's application: 404 and nothing changes", async () => {
-    const id = (await create()).json.id;
-    const res = await call(base, 'PATCH', `/${id}/decisions`, { cookie: cookieFor(userB), json: { decisions: { exp1_b1: false } } });
+    const { id } = (await create()).json;
+    const res = await call(base, 'PATCH', `/${id}`, { cookie: cookieFor(userB), json: { status: 'rejected' } });
     assert.equal(res.status, 404);
-    const doc = await Application.findById(id).lean();
-    assert.equal(doc.status, 'tailored');
-    assert.equal(Object.keys(doc.decisions ?? {}).length, 0);
+    assert.equal((await Application.findById(id).lean()).status, 'saved');
+  });
+});
+
+// ---------- decisions ----------
+
+describe('PATCH /:id/versions/:versionId/decisions', () => {
+  test('rejecting a passed rewrite is saved and the stored resume is rebuilt', async () => {
+    const { id, versionId } = (await create()).json;
+    const before = await ResumeVersion.findById(versionId).lean();
+    assert.equal(before.resumeJson.experience[0].bullets.find((b) => b.id === 'exp1_b1').text, 'Developed a React dashboard adopted by 40 teams');
+
+    const res = await call(base, 'PATCH', `/${id}/versions/${versionId}/decisions`, { json: { decisions: { exp1_b1: false } } });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { decisions: { exp1_b1: false } });
+
+    const after = await ResumeVersion.findById(versionId).lean();
+    assert.equal(after.resumeJson.experience[0].bullets.find((b) => b.id === 'exp1_b1').text, 'Built a React dashboard used by 40 teams');
+    assert.notEqual(after.texSource, before.texSource);
+  });
+
+  test('a rewrite the guardrail rejected (invented number) can NOT be accepted', async () => {
+    const { id, versionId } = (await create()).json;
+    const res = await call(base, 'PATCH', `/${id}/versions/${versionId}/decisions`, { json: { decisions: { exp1_b2: true } } });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'not_toggleable');
+  });
+
+  test("someone else's version, or a version under the wrong application: 404", async () => {
+    const { id, versionId } = (await create()).json;
+    const other = (await create({ json: await saveBody({ company: 'Globex' }) })).json.id;
+    const json = { decisions: { exp1_b1: false } };
+    assert.equal((await call(base, 'PATCH', `/${id}/versions/${versionId}/decisions`, { cookie: cookieFor(userB), json })).status, 404);
+    assert.equal((await call(base, 'PATCH', `/${other}/versions/${versionId}/decisions`, { json })).status, 404);
+    assert.equal(Object.keys((await ResumeVersion.findById(versionId).lean()).decisions ?? {}).length, 0);
   });
 
   test('bad bodies are refused', async () => {
-    const id = (await create()).json.id;
+    const { id, versionId } = (await create()).json;
     for (const json of [{}, { decisions: { exp1_b1: 'yes' } }, { decisions: { 'bad id!': true } }, { decisions: {}, status: 'final' }]) {
-      assert.equal((await call(base, 'PATCH', `/${id}/decisions`, { json })).status, 400, JSON.stringify(json));
+      assert.equal((await call(base, 'PATCH', `/${id}/versions/${versionId}/decisions`, { json })).status, 400, JSON.stringify(json));
     }
+  });
+});
+
+// ---------- delete ----------
+
+describe('DELETE /:id', () => {
+  test('deletes my application AND its resume versions (no orphans)', async () => {
+    const { id } = (await create()).json;
+    const keep = (await create({ json: await saveBody({ company: 'Globex' }) })).json.id;
+    // A second version under the first application, as a re-tailor would add.
+    const extra = await ResumeVersion.findOne({ applicationId: id }).lean();
+    await ResumeVersion.create({ ...extra, _id: undefined, createdAt: undefined, updatedAt: undefined });
+    assert.equal(await ResumeVersion.countDocuments({ applicationId: id }), 2);
+
+    const res = await call(base, 'DELETE', `/${id}`);
+    assert.equal(res.status, 204);
+    assert.equal(await Application.countDocuments({ _id: id }), 0);
+    assert.equal(await ResumeVersion.countDocuments({ applicationId: id }), 0);
+    // The other application and its version are untouched.
+    assert.equal(await ResumeVersion.countDocuments({ applicationId: keep }), 1);
+    assert.equal((await call(base, 'DELETE', `/${id}`)).status, 404, 'a second delete is a 404');
+  });
+
+  test("someone else's application: 404 and nothing is deleted", async () => {
+    const { id } = (await create()).json;
+    assert.equal((await call(base, 'DELETE', `/${id}`, { cookie: cookieFor(userB) })).status, 404);
+    assert.equal(await Application.countDocuments({ _id: id }), 1);
+    assert.equal(await ResumeVersion.countDocuments({ applicationId: id }), 1);
   });
 });
