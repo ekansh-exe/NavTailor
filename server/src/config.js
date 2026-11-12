@@ -18,4 +18,6 @@ export const config = {
   port: Number(process.env.PORT) || 5000,
   // Browsers send Origin without a trailing slash, so strip one if present.
   clientOrigin: required('CLIENT_ORIGIN').replace(/\/+$/, ''),
+  // Contains the DB password. Never log this value.
+  mongodbUri: required('MONGODB_URI'),
 };
