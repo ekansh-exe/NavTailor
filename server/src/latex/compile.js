@@ -44,8 +44,12 @@ function childEnv() {
 }
 
 // The exact arguments, in one place so they are easy to review. No shell-escape flag, ever.
-export function tectonicArgs(outdir) {
-  return ['-X', 'compile', '--untrusted', '--keep-logs', '--outdir', outdir, 'main.tex'];
+// onlyCached (TECTONIC_ONLY_CACHED=1, set in the Docker image): use only the TeX files already in the
+// cache, which the image build filled with `npm run warm:pdf`. No network fetch at runtime, so no
+// surprise slow compile, and a host with a wiped disk still works. Read per call, so the warm-up
+// itself (which runs before that variable is set) can still download.
+export function tectonicArgs(outdir, { onlyCached = process.env.TECTONIC_ONLY_CACHED === '1' } = {}) {
+  return ['-X', 'compile', '--untrusted', ...(onlyCached ? ['--only-cached'] : []), '--keep-logs', '--outdir', outdir, 'main.tex'];
 }
 
 // Remove our temp folder and the home folder from a log, drop control characters.

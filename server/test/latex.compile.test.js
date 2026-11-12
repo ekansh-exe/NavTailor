@@ -66,6 +66,14 @@ describe('compileTex: arguments and environment', () => {
     assert.equal(args.at(-1), 'main.tex');
   });
 
+  test('tectonicArgs adds --only-cached only when asked (the Docker image sets TECTONIC_ONLY_CACHED=1)', () => {
+    assert.ok(!tectonicArgs('/tmp/a', { onlyCached: false }).includes('--only-cached'));
+    const cached = tectonicArgs('/tmp/a', { onlyCached: true });
+    assert.ok(cached.includes('--only-cached'));
+    assert.ok(cached.includes('--untrusted'), 'still untrusted');
+    assert.equal(cached.at(-1), 'main.tex');
+  });
+
   test('tectonicArgs has no shell-escape flag for any folder name', () => {
     for (const dir of ['/tmp/a', '/tmp/shell-escape', '/tmp/a b']) {
       assert.ok(!tectonicArgs(dir).some((a) => a === '-Z' || a === '--shell-escape'));
