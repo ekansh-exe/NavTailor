@@ -63,13 +63,14 @@ USER node
 
 # Fill Tectonic's cache NOW, at build time: the TeX packages and fonts the template needs become part
 # of the image. A host that wipes its disk on every restart still has them, and the first real PDF
-# does not wait a minute for downloads.
+# does not wait a minute for downloads. The script then compiles again with --only-cached, so an
+# incomplete cache FAILS THIS BUILD instead of a user's PDF.
 RUN npm run warm:pdf
 
-# Only after the warm-up: from here on Tectonic may use cached files only (no network at runtime),
-# and the app runs in production mode (Secure cookie, no /api/dev routes).
+# At runtime Tectonic may still download a file the cache lacks (TECTONIC_ONLY_CACHED is deliberately
+# NOT set): a template change that needs a new font then costs one slow compile, not a broken PDF.
+# Production mode: Secure cookie, no /api/dev routes.
 ENV NODE_ENV=production \
-    TECTONIC_ONLY_CACHED=1 \
     PORT=8000
 
 EXPOSE 8000

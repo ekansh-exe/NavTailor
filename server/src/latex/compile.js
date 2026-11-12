@@ -44,10 +44,10 @@ function childEnv() {
 }
 
 // The exact arguments, in one place so they are easy to review. No shell-escape flag, ever.
-// onlyCached (TECTONIC_ONLY_CACHED=1, set in the Docker image): use only the TeX files already in the
-// cache, which the image build filled with `npm run warm:pdf`. No network fetch at runtime, so no
-// surprise slow compile, and a host with a wiped disk still works. Read per call, so the warm-up
-// itself (which runs before that variable is set) can still download.
+// onlyCached (--only-cached): use only the TeX files already in the cache, never download. The
+// warm-up uses it to PROVE the cache is complete (scripts/warmPdf.js). TECTONIC_ONLY_CACHED=1 turns it on
+// for every compile; the Docker image leaves it off on purpose, so a file the cache lacks is downloaded
+// (one slow compile) instead of failing the user's PDF.
 export function tectonicArgs(outdir, { onlyCached = process.env.TECTONIC_ONLY_CACHED === '1' } = {}) {
   return ['-X', 'compile', '--untrusted', ...(onlyCached ? ['--only-cached'] : []), '--keep-logs', '--outdir', outdir, 'main.tex'];
 }
@@ -121,7 +121,8 @@ async function readLogTail(file) {
 // Returns { pdfPath, cleanup }. The caller MUST call cleanup() when it has finished with the PDF.
 // On any failure the temp folder is already gone and a CompileError is thrown.
 // Options exist so tests can use a fake program and a known temp root.
-export async function compileTex(source, { timeoutMs = COMPILE_TIMEOUT_MS, command = 'tectonic', argsPrefix = [], tmpRoot = os.tmpdir() } = {}) {
+// onlyCached: undefined = follow TECTONIC_ONLY_CACHED; true/false = force it (the warm-up's cache check).
+export async function compileTex(source, { timeoutMs = COMPILE_TIMEOUT_MS, command = 'tectonic', argsPrefix = [], tmpRoot = os.tmpdir(), onlyCached } = {}) {
   if (typeof source !== 'string' || !source) throw new TypeError('compileTex expects a non-empty string');
 
   const dir = await fs.mkdtemp(path.join(tmpRoot, 'navtailor-'));
@@ -133,7 +134,7 @@ export async function compileTex(source, { timeoutMs = COMPILE_TIMEOUT_MS, comma
 
     let run;
     try {
-      run = await runChild(command, [...argsPrefix, ...tectonicArgs(dir)], { cwd: dir, timeoutMs });
+      run = await runChild(command, [...argsPrefix, ...tectonicArgs(dir, onlyCached === undefined ? {} : { onlyCached })], { cwd: dir, timeoutMs });
     } catch (err) {
       // ENOENT: not installed. EACCES: not executable. Either way we cannot compile here.
       if (err?.code === 'ENOENT' || err?.code === 'EACCES') throw new CompileError('unavailable');

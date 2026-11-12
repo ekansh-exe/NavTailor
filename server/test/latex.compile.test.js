@@ -74,6 +74,15 @@ describe('compileTex: arguments and environment', () => {
     assert.equal(cached.at(-1), 'main.tex');
   });
 
+  test('compileTex passes onlyCached through to the arguments (the warm-up cache check uses it)', async () => {
+    for (const onlyCached of [true, false]) {
+      const { pdfPath, cleanup } = await compileTex('%MODE:ok\nhello', fake({ onlyCached }));
+      const args = JSON.parse(/%ARGS:(.*)/.exec(fs.readFileSync(pdfPath, 'utf8'))[1]);
+      await cleanup();
+      assert.equal(args.includes('--only-cached'), onlyCached);
+    }
+  });
+
   test('tectonicArgs has no shell-escape flag for any folder name', () => {
     for (const dir of ['/tmp/a', '/tmp/shell-escape', '/tmp/a b']) {
       assert.ok(!tectonicArgs(dir).some((a) => a === '-Z' || a === '--shell-escape'));
