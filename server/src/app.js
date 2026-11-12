@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { config } from './config.js';
 import { authRouter } from './routes/auth.js';
 import { profileRouter } from './routes/profile.js';
+import { createDevRouter } from './routes/dev.js';
 
 export const app = express();
 
@@ -31,3 +32,8 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
+
+// Dev-only tools. In production this is never mounted, so the URL is a plain 404.
+if (!config.isProduction) {
+  app.use('/api/dev', createDevRouter());
+}
