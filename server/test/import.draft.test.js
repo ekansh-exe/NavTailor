@@ -89,6 +89,52 @@ describe('prompt', () => {
 });
 
 describe('buildDraft', () => {
+  test('optional fields written in the file are kept; invented ones are cleared or removed', () => {
+    const source = `${SOURCE}
+Remote
+NavTailor -- AI resume tailoring, Mar 2024
+Achievements: Winner, Smart India Hackathon among 500 teams
+Leadership: Lead, Coding Club 2022 - 2023`;
+    const data = base();
+    data.experience[0].location = 'Remote';
+    data.experience.push({ ...structuredClone(data.experience[0]), location: 'Berlin' });
+    data.projects = [
+      { id: 'x', name: 'NavTailor', tagline: 'AI resume tailoring', dates: 'Mar 2024', link: '', skills: [], bullets: [] },
+      { id: 'x', name: 'NavTailor', tagline: 'A world-class platform', dates: 'Mar 2019', link: '', skills: [], bullets: [] },
+    ];
+    data.achievements = [
+      { id: 'x', text: 'Winner, Smart India Hackathon among 500 teams' },
+      { id: 'x', text: 'Gold medal at the national olympiad' },
+    ];
+    data.activitiesHeading = 'Leadership';
+    data.activities = [
+      { id: 'x', title: 'Lead, Coding Club', detail: '2022 - 2023' },
+      { id: 'x', title: 'Lead, Coding Club', detail: 'IEEE Conference' },
+      { id: 'x', title: 'President, Student Council', detail: '' },
+    ];
+    const { draft, warnings } = buildDraft(data, source);
+
+    assert.deepEqual(draft.experience.map((j) => j.location), ['Remote', '']);
+    assert.deepEqual(draft.projects.map((p) => [p.tagline, p.dates]), [['AI resume tailoring', 'Mar 2024'], ['', '']]);
+    assert.deepEqual(draft.achievements, [{ id: 'ach1', text: 'Winner, Smart India Hackathon among 500 teams' }]);
+    assert.equal(draft.activitiesHeading, 'Leadership');
+    assert.deepEqual(draft.activities, [
+      { id: 'act1', title: 'Lead, Coding Club', detail: '2022 - 2023' },
+      { id: 'act2', title: 'Lead, Coding Club', detail: '' },
+    ]);
+    for (const expected of ['experience[1].location', 'projects[1].tagline', 'projects[1].dates', 'achievements[1]', 'activities[1].detail', 'activities[2] title']) {
+      assert.ok(warnings.some((w) => w.startsWith(expected)), `no warning for ${expected}`);
+    }
+    assert.ok(profileSchema.safeParse(draft).success);
+  });
+
+  test('a model reply without the optional sections still validates (they default to empty)', () => {
+    const parsed = importSchema.parse(base());
+    assert.deepEqual([parsed.achievements, parsed.activities, parsed.activitiesHeading], [[], [], '']);
+    const { draft } = buildDraft(parsed, SOURCE);
+    assert.ok(profileSchema.safeParse(draft).success);
+  });
+
   test('a fully grounded result keeps its content and passes profileSchema', () => {
     const { draft, warnings } = buildDraft(base(), SOURCE);
     assert.deepEqual(warnings, []);

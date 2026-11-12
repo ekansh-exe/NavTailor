@@ -14,6 +14,10 @@ export function buildDraft(data, sourceText) {
   const has = (value) => value !== '' && source.includes(norm(value));
 
   const draft = structuredClone(data);
+  // Optional sections: the schema defaults them, but a caller may hand us data without them.
+  draft.achievements ??= [];
+  draft.activities ??= [];
+  draft.activitiesHeading ??= '';
 
   // --- grounding: basics ---
   const b = draft.basics;
@@ -85,6 +89,10 @@ export function buildDraft(data, sourceText) {
   });
   draft.experience.forEach((job, i) => {
     groundDates(job, `experience[${i}]`);
+    if (job.location && !has(job.location)) {
+      job.location = '';
+      warnings.push(`experience[${i}].location was not found in the file and was cleared`);
+    }
     job.bullets.forEach((bullet, j) => {
       bullet.skills = groundTags(bullet.skills, `experience[${i}].bullets[${j}].skills`);
       bullet.alwaysInclude = false;
@@ -98,6 +106,12 @@ export function buildDraft(data, sourceText) {
       p.link = '';
       warnings.push(`projects[${i}].link was not found in the file and was cleared`);
     }
+    // A tagline is the model's favourite place to invent a description, so it must be in the file.
+    if (p.tagline && !has(p.tagline)) {
+      p.tagline = '';
+      warnings.push(`projects[${i}].tagline was not found in the file and was cleared`);
+    }
+    groundDates(p, `projects[${i}]`);
     p.skills = groundTags(p.skills, `projects[${i}].skills`);
     p.bullets.forEach((bullet, j) => {
       bullet.skills = groundTags(bullet.skills, `projects[${i}].bullets[${j}].skills`);
@@ -111,6 +125,28 @@ export function buildDraft(data, sourceText) {
       warnings.push(`certifications[${i}].year was not found in the file and was cleared`);
     }
   });
+  // --- achievements and activities: an item not in the file is removed ---
+  draft.achievements = draft.achievements.filter((a, i) => {
+    if (a.text && !has(a.text)) {
+      warnings.push(`achievements[${i}] was not found in the file; entry removed`);
+      return false;
+    }
+    checkMetrics(a, `achievements[${i}]`);
+    return true;
+  });
+  draft.activities = draft.activities.filter((a, i) => {
+    if (a.title && !has(a.title)) {
+      warnings.push(`activities[${i}] title was not found in the file; entry removed`);
+      return false;
+    }
+    if (a.detail && !has(a.detail)) {
+      a.detail = '';
+      warnings.push(`activities[${i}].detail was not found in the file and was cleared`);
+    }
+    return true;
+  });
+  if (draft.activitiesHeading && !has(draft.activitiesHeading)) draft.activitiesHeading = '';
+
   for (const key of ['languages', 'frameworks', 'tools']) {
     draft.skills[key] = groundTags(draft.skills[key], `skills.${key}`);
   }
@@ -126,6 +162,8 @@ export function buildDraft(data, sourceText) {
     p.bullets.forEach((bullet, j) => (bullet.id = `${p.id}_b${j + 1}`));
   });
   draft.certifications.forEach((c, i) => (c.id = `cert${i + 1}`));
+  draft.achievements.forEach((a, i) => (a.id = `ach${i + 1}`));
+  draft.activities.forEach((a, i) => (a.id = `act${i + 1}`));
 
   return { draft, warnings };
 }
