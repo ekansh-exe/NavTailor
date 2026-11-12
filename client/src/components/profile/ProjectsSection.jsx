@@ -28,6 +28,21 @@ export default function ProjectsSection({ items, onChange }) {
               onChange={(link) => onChange(setAt(items, i, { link }))}
               maxLength={LIMIT.url}
             />
+            <TextField
+              label="Tagline (optional)"
+              placeholder="AI resume tailoring"
+              // ?? '' because profiles saved before these fields existed may not carry them yet.
+              value={project.tagline ?? ''}
+              onChange={(tagline) => onChange(setAt(items, i, { tagline }))}
+              maxLength={LIMIT.short}
+            />
+            <TextField
+              label="Date (optional)"
+              placeholder="Mar 2024"
+              value={project.dates ?? ''}
+              onChange={(dates) => onChange(setAt(items, i, { dates }))}
+              maxLength={LIMIT.dates}
+            />
           </div>
           <TagInput
             label="Skills"

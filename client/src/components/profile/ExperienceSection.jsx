@@ -33,6 +33,14 @@ export default function ExperienceSection({ items, onChange }) {
               onChange={(dates) => onChange(setAt(items, i, { dates }))}
               maxLength={LIMIT.dates}
             />
+            <TextField
+              label="Location (optional)"
+              placeholder="Bangalore, or Remote"
+              // ?? '' because profiles saved before this field existed may not carry it yet.
+              value={job.location ?? ''}
+              onChange={(location) => onChange(setAt(items, i, { location }))}
+              maxLength={LIMIT.short}
+            />
           </div>
           <BulletsEditor
             bullets={job.bullets}

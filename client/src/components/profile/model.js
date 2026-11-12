@@ -21,6 +21,10 @@ export const LIMIT = {
   projects: 20,
   projectBullets: 10,
   certifications: 30,
+  achievement: 300,
+  achievements: 15,
+  activities: 15,
+  heading: 60,
   skillList: 60,
   itemSkills: 15,
 };
@@ -48,12 +52,15 @@ export const newExperience = () => ({
   company: '',
   role: '',
   dates: '',
+  location: '',
   bullets: [],
 });
 
 export const newProject = () => ({
   id: newId('p'),
   name: '',
+  tagline: '',
+  dates: '',
   link: '',
   skills: [],
   bullets: [],
@@ -66,6 +73,10 @@ export const newCertification = () => ({
   year: '',
   skills: [],
 });
+
+export const newAchievement = () => ({ id: newId('ach'), text: '' });
+
+export const newActivity = () => ({ id: newId('act'), title: '', detail: '' });
 
 // Immutable list helpers. React only re-renders when it sees a NEW object/array, so we
 // never mutate: each helper returns a fresh copy.
@@ -98,6 +109,8 @@ export function isProfileEmpty(p) {
     p.experience.length === 0 &&
     p.projects.length === 0 &&
     p.certifications.length === 0 &&
+    !p.achievements?.length &&
+    !p.activities?.length &&
     p.skills.languages.length === 0 &&
     p.skills.frameworks.length === 0 &&
     p.skills.tools.length === 0
