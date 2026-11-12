@@ -26,4 +26,21 @@ export const config = {
   jwtSecret: required('JWT_SECRET'),
   // Cookies get the Secure flag only in production (localhost dev runs over plain http).
   isProduction: process.env.NODE_ENV === 'production',
+  llm: {
+    // Per attempt, covers waiting for the headers AND reading the whole body.
+    timeoutMs: 20_000,
+    // Optional on purpose: without a key the route is skipped, profile editing still works.
+    // Never log these values.
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    groqApiKey: process.env.GROQ_API_KEY || '',
+  },
+};
+
+// Model ids for the LLM routes. Fill these in yourself (run `node scripts/listModels.js` to see
+// which ids your keys can use). An empty id disables that route: callLLM skips it.
+export const MODELS = {
+     geminiPrimary: 'gemini-3.6-flash',
+     geminiFallback: 'gemini-3.5-flash-lite',
+     groq: 'openai/gpt-oss-120b',
+   
 };
