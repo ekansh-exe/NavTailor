@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPut } from '../api/client.js';
-import BasicsSection from '../components/profile/BasicsSection.jsx';
-import EducationSection from '../components/profile/EducationSection.jsx';
-import ExperienceSection from '../components/profile/ExperienceSection.jsx';
-import ProjectsSection from '../components/profile/ProjectsSection.jsx';
-import CertificationsSection from '../components/profile/CertificationsSection.jsx';
-import SkillsSection from '../components/profile/SkillsSection.jsx';
+import ProfileForm from '../components/profile/ProfileForm.jsx';
+import ImportPanel from '../components/import/ImportPanel.jsx';
 import { Button } from '../components/profile/ui.jsx';
-import { cleanForSave, formatIssuePath } from '../components/profile/model.js';
+import { cleanForSave, formatIssuePath, isProfileEmpty } from '../components/profile/model.js';
 
 // The master profile editor. The whole profile lives in ONE state object. Each section
 // receives its slice plus an onChange that swaps that slice for a new copy.
@@ -18,6 +14,7 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState(null); // { ok: true } | { ok: false, message, issues }
+  const [importing, setImporting] = useState(false); // true while the import flow replaces the editor
 
   const load = useCallback(async () => {
     setLoadError('');
@@ -91,28 +88,34 @@ export default function ProfilePage() {
     return <p className="font-mono text-sm uppercase">Loading profile...</p>;
   }
 
+  if (importing) {
+    return (
+      <ImportPanel
+        replacesExisting={!isProfileEmpty(profile)}
+        onCancel={() => setImporting(false)}
+        onSaved={(saved) => {
+          // The server confirmed the imported profile: it becomes the saved baseline.
+          setProfile(saved);
+          setSavedJson(JSON.stringify(saved));
+          setSaveResult({ ok: true });
+          setImporting(false);
+        }}
+      />
+    );
+  }
+
   let status = 'All changes saved';
   if (dirty) status = 'Unsaved changes';
   else if (saveResult?.ok) status = 'Saved';
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl">Master profile</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-3xl">Master profile</h2>
+        <Button onClick={() => setImporting(true)}>Import from resume</Button>
+      </div>
 
-      <BasicsSection
-        basics={profile.basics}
-        summary={profile.summary}
-        onBasicsChange={(basics) => update({ basics })}
-        onSummaryChange={(summary) => update({ summary })}
-      />
-      <EducationSection items={profile.education} onChange={(education) => update({ education })} />
-      <ExperienceSection items={profile.experience} onChange={(experience) => update({ experience })} />
-      <ProjectsSection items={profile.projects} onChange={(projects) => update({ projects })} />
-      <CertificationsSection
-        items={profile.certifications}
-        onChange={(certifications) => update({ certifications })}
-      />
-      <SkillsSection skills={profile.skills} onChange={(skills) => update({ skills })} />
+      <ProfileForm profile={profile} onChange={update} />
 
       {saveResult && !saveResult.ok && (
         <div role="alert" className="border-2 border-ink bg-alert p-4 shadow-hard">

@@ -85,6 +85,25 @@ export function cleanForSave(profile) {
   };
 }
 
+// True when there is nothing in the profile worth protecting from an overwrite.
+export function isProfileEmpty(p) {
+  return (
+    !p.basics.name &&
+    !p.basics.email &&
+    !p.basics.phone &&
+    !p.basics.location &&
+    p.basics.links.length === 0 &&
+    !p.summary &&
+    p.education.length === 0 &&
+    p.experience.length === 0 &&
+    p.projects.length === 0 &&
+    p.certifications.length === 0 &&
+    p.skills.languages.length === 0 &&
+    p.skills.frameworks.length === 0 &&
+    p.skills.tools.length === 0
+  );
+}
+
 // "experience.0.bullets.1.text" -> "Experience › #1 › Bullets › #2 › text"
 export function formatIssuePath(path) {
   if (!path) return 'Profile';

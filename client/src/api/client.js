@@ -31,6 +31,15 @@ export function apiPut(path, body) {
   });
 }
 
+// Sends a file as multipart/form-data. We deliberately set NO Content-Type header:
+// the browser must write it itself, because it includes the random "boundary" string that
+// separates the parts. Setting it by hand would leave the server unable to find the file.
+export function apiUpload(path, file, fieldName = 'file') {
+  const form = new FormData();
+  form.append(fieldName, file);
+  return request(path, { method: 'POST', body: form });
+}
+
 export function apiPost(path, body) {
   return request(path, {
     method: 'POST',
