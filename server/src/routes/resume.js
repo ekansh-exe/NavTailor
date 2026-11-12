@@ -19,6 +19,7 @@ import { fitToOnePage, MAX_DROPS, FIT_DEADLINE_MS } from '../latex/fitToPage.js'
 //     X-Resume-Dropped  ids of the bullets that were dropped, comma separated, in order (may be empty)
 //     X-Resume-Fit      fits | too_long | unknown
 // GET  /api/resume/tex                     -> the LaTeX source of your saved profile
+// POST /api/resume/tex  { resumeJson }      -> the LaTeX source of the resume you send (e.g. a tailored one)
 // Nothing here is saved. Nothing from a resume or a compile log is ever written to the console.
 
 // The client sends the resume as a JSON object in profile shape (what the tailoring step returns).
@@ -29,6 +30,7 @@ const scoresSchema = z
   .record(idSchema, z.number().min(0).max(1000))
   .refine((scores) => Object.keys(scores).length <= 200, 'At most 200 scores');
 const renderBodySchema = z.strictObject({ resumeJson: profileSchema, scores: scoresSchema.optional() });
+const texBodySchema = z.strictObject({ resumeJson: profileSchema });
 
 const fail = (res, status, code, error, extra = {}) => res.status(status).json({ error, code, ...extra });
 
@@ -56,6 +58,16 @@ export function createResumeRouter({
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => fail(res, 429, 'rate_limited', 'Too many PDF builds, try again in a few minutes'),
+  });
+
+  // Making .tex is only string work (no compile), so it gets a looser limit of its own.
+  const texLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: limit * 3,
+    keyGenerator: (req) => req.user.id,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => fail(res, 429, 'rate_limited', 'Too many downloads, try again in a few minutes'),
   });
 
   // Compiles running right now. A small cap keeps the server responsive.
@@ -176,6 +188,29 @@ export function createResumeRouter({
       console.error('resume tex failed:', err?.name ?? 'Error');
       return fail(res, 500, 'internal', 'Could not build the LaTeX source');
     }
+  });
+
+  router.post('/tex', texLimiter, (req, res) => {
+    const parsed = texBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.slice(0, 20).map((i) => ({ path: i.path.join('.'), message: i.message }));
+      return fail(res, 400, 'bad_resume', 'Send { "resumeJson": { ...a resume in profile shape... } }', { issues });
+    }
+
+    let tex;
+    try {
+      // Same template and escaping as the PDF, so the download is exactly what /render compiles.
+      tex = renderResume(parsed.data.resumeJson);
+    } catch {
+      return fail(res, 400, 'bad_resume', 'That resume could not be turned into a document (check its links)');
+    }
+
+    res.status(200).set({
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="resume.tex"',
+      'Cache-Control': 'no-store',
+    });
+    return res.send(tex);
   });
 
   return router;

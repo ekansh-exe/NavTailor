@@ -112,6 +112,7 @@ export const tailorResponseSchema = z.strictObject({
   gapReport: gapReportSchema,
   questions: z.array(questionSchema),
   resume: profileSchema, // the selected, rewritten content in stored-profile shape (what /render takes)
+  scores: z.record(idSchema, z.number().min(0)), // selected bullet id -> score (what /render takes)
   warnings: z.array(z.string()), // codes only, never resume text
   meta: z.strictObject({
     providers: z.strictObject({ analyze: z.string(), rewrite: z.string().nullable() }),

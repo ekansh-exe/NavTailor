@@ -8,6 +8,7 @@ import { profileRouter } from './routes/profile.js';
 import { createDevRouter } from './routes/dev.js';
 import { createResumeRouter } from './routes/resume.js';
 import { createTailorRouter } from './routes/tailor.js';
+import { createApplicationsRouter } from './routes/applications.js';
 
 export const app = express();
 
@@ -42,6 +43,9 @@ app.use('/api/resume', createResumeRouter());
 
 // Job description -> tailored one-page resume content. Saves nothing. Auth is applied inside.
 app.use('/api/tailor', createTailorRouter());
+
+// Saved tailoring runs (one user, many applications). Auth is applied inside.
+app.use('/api/applications', createApplicationsRouter());
 
 // Dev-only tools. In production this is never mounted, so the URL is a plain 404.
 if (!config.isProduction) {

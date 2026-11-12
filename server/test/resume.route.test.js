@@ -443,6 +443,42 @@ describe('limits', () => {
   });
 });
 
+// ---------- POST /tex ----------
+
+describe('POST /tex (the resume you send)', () => {
+  test('no cookie: 401', async () => {
+    assert.equal((await call(base, 'POST', '/api/resume/tex', { cookie: null, json: { resumeJson: resume() } })).status, 401);
+  });
+
+  test('returns the LaTeX of the SENT resume (not the saved profile) as a text download, without compiling', async () => {
+    const sent = resume({ summary: 'Tailored summary.' });
+    const res = await call(base, 'POST', '/api/resume/tex', { json: { resumeJson: sent } });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-disposition'), 'attachment; filename="resume.tex"');
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.equal(res.text, renderResume(sent));
+    assert.equal(compileCalls.length, 0);
+    assert.equal(loadCalls.length, 0);
+  });
+
+  test('special characters are escaped exactly like the PDF path', async () => {
+    const sent = resume();
+    sent.experience[0].bullets[0].text = 'Cut costs 20% & shipped $5 {fast} with C# \\input{/etc/passwd}';
+    const res = await call(base, 'POST', '/api/resume/tex', { json: { resumeJson: sent } });
+    assert.equal(res.status, 200);
+    assert.ok(!res.text.includes('\\input{/etc/passwd}'));
+    assert.ok(res.text.includes('20\\%'));
+  });
+
+  test('a bad body: 400 with issue paths, and resume text is not echoed', async () => {
+    const res = await call(base, 'POST', '/api/resume/tex', { json: { resumeJson: { ...resume(), userId: 'SECRET-XYZ' } } });
+    assert.equal(res.status, 400);
+    assert.equal(res.json.code, 'bad_resume');
+    assert.ok(!res.text.includes('SECRET-XYZ'));
+    assert.equal((await call(base, 'POST', '/api/resume/tex', { json: {} })).status, 400);
+  });
+});
+
 // ---------- GET /tex ----------
 
 describe('GET /tex (fake profile loader)', () => {

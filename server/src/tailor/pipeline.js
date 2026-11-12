@@ -106,6 +106,9 @@ export async function runTailor({ profile, jobDescription, llm = callLLM }) {
     gapReport,
     questions,
     resume,
+    // Score of every selected bullet. POST /api/resume/render uses it to pick which bullet to drop
+    // when the PDF runs past one page.
+    scores: Object.fromEntries(selectedIds.map((id) => [id, score.get(id)])),
     warnings: [...new Set(warnings)],
     meta: { providers: { analyze: analyzed.provider, rewrite: rewriteProvider }, ms: Date.now() - started },
   };
