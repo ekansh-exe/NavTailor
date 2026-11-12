@@ -24,6 +24,10 @@ const LIMIT = {
   projects: 20,
   projectBullets: 10,
   certifications: 30,
+  achievement: 300, // one line, e.g. "Winner, Smart India Hackathon 2024 among 500+ teams"
+  achievements: 15,
+  activities: 15,
+  heading: 60, // the user's own name for the activities section
   skillList: 60, // languages, frameworks, tools: max items each
   itemSkills: 15, // skill tags on one bullet / project / certification
 };
@@ -80,6 +84,8 @@ export const experienceItemSchema = z.strictObject({
   company: text(LIMIT.short),
   role: text(LIMIT.short),
   dates: text(LIMIT.dates),
+  // Optional ("Bangalore", "Remote"). text() defaults to "", so older profiles still validate.
+  location: text(LIMIT.short),
   bullets: z.array(experienceBulletSchema).max(LIMIT.experienceBullets).default([]),
 });
 
@@ -93,6 +99,9 @@ export const projectBulletSchema = z.strictObject({
 export const projectItemSchema = z.strictObject({
   id,
   name: text(LIMIT.short),
+  // Optional: a one-line description shown as "Name -- tagline", and a date ("Mar 2024").
+  tagline: text(LIMIT.short),
+  dates: text(LIMIT.dates),
   link: emptyOr(url),
   skills: tags(LIMIT.itemSkills),
   bullets: z.array(projectBulletSchema).max(LIMIT.projectBullets).default([]),
@@ -106,14 +115,29 @@ export const certificationItemSchema = z.strictObject({
   skills: tags(LIMIT.itemSkills),
 });
 
+// Optional sections. One line of text each; nothing in them is scored or rewritten by the LLM.
+export const achievementItemSchema = z.strictObject({
+  id,
+  text: text(LIMIT.achievement),
+});
+
+// A position, club, paper or talk: title on the left, a date or venue on the right.
+export const activityItemSchema = z.strictObject({
+  id,
+  title: text(LIMIT.short),
+  detail: text(LIMIT.short),
+});
+
 export const skillsSchema = z.strictObject({
   languages: tags(LIMIT.skillList),
   frameworks: tags(LIMIT.skillList),
   tools: tags(LIMIT.skillList),
 });
 
-// Every top-level section is required on purpose: PUT replaces the whole profile,
-// so a request that forgets a section is an error, not a silent wipe of that section.
+// The original sections are required on purpose: PUT replaces the whole profile, so a request
+// that forgets a section is an error, not a silent wipe of that section.
+// The optional sections added later (achievements, activities) default to empty instead, so
+// tailored resumes saved before they existed still validate when they are rendered again.
 export const profileSchema = z
   .strictObject({
     basics: basicsSchema,
@@ -123,6 +147,9 @@ export const profileSchema = z
     projects: z.array(projectItemSchema).max(LIMIT.projects),
     certifications: z.array(certificationItemSchema).max(LIMIT.certifications),
     skills: skillsSchema,
+    achievements: z.array(achievementItemSchema).max(LIMIT.achievements).default([]),
+    activitiesHeading: text(LIMIT.heading), // "" means the default heading, "Activities"
+    activities: z.array(activityItemSchema).max(LIMIT.activities).default([]),
   })
   .superRefine((profile, ctx) => {
     // Ids must be unique across the WHOLE profile (a job, a bullet and a project can
@@ -146,4 +173,6 @@ export const profileSchema = z
       p.bullets.forEach((b, j) => check(b.id, ['projects', i, 'bullets', j, 'id']));
     });
     profile.certifications.forEach((c, i) => check(c.id, ['certifications', i, 'id']));
+    profile.achievements.forEach((a, i) => check(a.id, ['achievements', i, 'id']));
+    profile.activities.forEach((a, i) => check(a.id, ['activities', i, 'id']));
   });

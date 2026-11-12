@@ -20,6 +20,7 @@ export function isEmptyProfile(p) {
   return (
     !p.basics.name && !p.summary &&
     !p.education.length && !p.experience.length && !p.projects.length && !p.certifications.length &&
+    !p.achievements?.length && !p.activities?.length &&
     !p.skills.languages.length && !p.skills.frameworks.length && !p.skills.tools.length
   );
 }

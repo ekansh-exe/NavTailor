@@ -37,6 +37,7 @@ const experienceSchema = new Schema(
     company: text,
     role: text,
     dates: text,
+    location: text, // added later: older stored jobs read back as ""
     bullets: [experienceBulletSchema],
   },
   subdoc,
@@ -51,6 +52,8 @@ const projectSchema = new Schema(
   {
     id: itemId,
     name: text,
+    tagline: text, // tagline and dates were added later: older stored projects read back as ""
+    dates: text,
     link: text,
     skills: stringList(),
     bullets: [projectBulletSchema],
@@ -62,6 +65,9 @@ const certificationSchema = new Schema(
   { id: itemId, name: text, issuer: text, year: text, skills: stringList() },
   subdoc,
 );
+
+const achievementSchema = new Schema({ id: itemId, text }, subdoc);
+const activitySchema = new Schema({ id: itemId, title: text, detail: text }, subdoc);
 
 const profileSchema = new Schema(
   {
@@ -90,6 +96,11 @@ const profileSchema = new Schema(
       frameworks: stringList(),
       tools: stringList(),
     },
+
+    // Optional sections, added later. A profile saved before them reads back with [] and "".
+    achievements: [achievementSchema],
+    activitiesHeading: text,
+    activities: [activitySchema],
   },
   {
     // createdAt AND updatedAt: unlike a User, a profile is edited over time.
