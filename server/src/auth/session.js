@@ -9,7 +9,8 @@ const SESSION_SECONDS = 7 * 24 * 60 * 60; // 7 days
 // browser sees the same name + path (+ flags), so these must never drift apart.
 export const cookieOptions = {
   httpOnly: true, // JavaScript cannot read it, so XSS cannot steal it
-  secure: config.isProduction, // https only in production
+  // https only, except in local development (plain http://localhost). Fails closed: see config.js.
+  secure: !config.isDevelopment,
   sameSite: 'lax', // not sent on cross-site POSTs (CSRF defence)
   path: '/',
 };

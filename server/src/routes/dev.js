@@ -4,7 +4,7 @@ import { callLLM } from '../llm/index.js';
 import { LLMError } from '../llm/errors.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
-// DEV ONLY. app.js mounts this router only when NODE_ENV is not "production".
+// DEV ONLY. app.js mounts this router only when NODE_ENV is exactly "development" (npm run dev).
 // It exists so you can poke callLLM from curl and watch fallback happen.
 
 const SAMPLE_TEXT =

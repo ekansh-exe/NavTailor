@@ -117,8 +117,16 @@ describe('POST /api/dev/llm-test', () => {
   });
 });
 
+function childEnv(nodeEnv) {
+  const env = { ...process.env, TEST_COOKIE: cookie };
+  delete env.NODE_ENV;
+  if (nodeEnv !== null) env.NODE_ENV = nodeEnv;
+  return env;
+}
+
 // Runs the REAL app (app.js) in a child process, because config.js reads NODE_ENV once at import.
 // The body is deliberately invalid, so even when the route exists it answers 400 and no LLM call is made.
+// nodeEnv null = NODE_ENV not set at all.
 function statusFromRealApp(nodeEnv) {
   const appUrl = new URL('../src/app.js', import.meta.url).href;
   const code = `
@@ -134,18 +142,48 @@ function statusFromRealApp(nodeEnv) {
     process.exit(0);
   `;
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', code], {
-    env: { ...process.env, NODE_ENV: nodeEnv, TEST_COOKIE: cookie },
+    env: childEnv(nodeEnv),
     encoding: 'utf8',
   });
   return Number(out.trim().split('\n').pop());
 }
 
 describe('dev route mounting in the real app', () => {
-  test('outside production the route exists (auth passes, bad body gets 400)', () => {
+  test('with NODE_ENV=development the route exists (auth passes, bad body gets 400)', () => {
     assert.equal(statusFromRealApp('development'), 400);
   });
 
   test('in production the route is not mounted: 404', () => {
     assert.equal(statusFromRealApp('production'), 404);
   });
+
+  // Fail closed: a server deployed without NODE_ENV, or with a typo, must NOT expose dev routes.
+  for (const nodeEnv of [null, '', 'prod', 'Development', 'test']) {
+    test(`with NODE_ENV=${JSON.stringify(nodeEnv)} the route is not mounted: 404`, () => {
+      assert.equal(statusFromRealApp(nodeEnv), 404);
+    });
+  }
+});
+
+// Reads cookieOptions.secure from session.js in a child process with the given NODE_ENV.
+function secureFlag(nodeEnv) {
+  const sessionUrl = new URL('../src/auth/session.js', import.meta.url).href;
+  const code = `
+    const { cookieOptions } = await import(${JSON.stringify(sessionUrl)});
+    console.log(cookieOptions.secure);
+  `;
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', code], { env: childEnv(nodeEnv), encoding: 'utf8' });
+  return out.trim().split('\n').pop() === 'true';
+}
+
+describe('session cookie Secure flag', () => {
+  test('is off only with NODE_ENV=development (plain http://localhost)', () => {
+    assert.equal(secureFlag('development'), false);
+  });
+
+  for (const nodeEnv of [null, 'production', 'prod']) {
+    test(`is on with NODE_ENV=${JSON.stringify(nodeEnv)}`, () => {
+      assert.equal(secureFlag(nodeEnv), true);
+    });
+  }
 });

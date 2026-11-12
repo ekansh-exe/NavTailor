@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "NODE_ENV=development node --watch src/index.js",
     "start": "node src/index.js",
     "test": "node --test \"test/**/*.test.js\"",
     "warm:pdf": "node scripts/warmPdf.js"

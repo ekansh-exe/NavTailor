@@ -57,8 +57,9 @@ app.use('/api/tailor', createTailorRouter());
 // Saved tailoring runs (one user, many applications). Auth is applied inside.
 app.use('/api/applications', createApplicationsRouter());
 
-// Dev-only tools. In production this is never mounted, so the URL is a plain 404.
-if (!config.isProduction) {
+// Dev-only tools, mounted ONLY with NODE_ENV=development (npm run dev). Everywhere else, including a
+// server where NODE_ENV was forgotten, the URL is a plain 404.
+if (config.isDevelopment) {
   app.use('/api/dev', createDevRouter());
 }
 

@@ -28,8 +28,10 @@ export const config = {
   // real client IP from X-Forwarded-For, which the per-IP sign-in limit needs. Leave unset locally:
   // trusting a header no proxy wrote would let a client pick its own IP.
   trustProxy: Number(process.env.TRUST_PROXY) || 0,
-  // Cookies get the Secure flag only in production (localhost dev runs over plain http).
-  isProduction: process.env.NODE_ENV === 'production',
+  // FAIL CLOSED: the relaxed dev behaviour (the /api/dev routes, a session cookie without Secure)
+  // needs NODE_ENV to be exactly "development", which `npm run dev` sets. Anything else, including a
+  // missing or misspelled NODE_ENV on a server, gets the safe production behaviour.
+  isDevelopment: process.env.NODE_ENV === 'development',
   llm: {
     // Per attempt, covers waiting for the headers AND reading the whole body.
     timeoutMs: 20_000,
