@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { Profile } from '../models/Profile.js';
 import { profileSchema } from '../schemas/profile.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { createImportRouter } from './profileImport.js';
 
 export const profileRouter = Router();
 
 // Applied to the whole router, so a route added here later cannot forget the auth check.
 profileRouter.use(requireAuth);
+
+// POST /api/profile/import: resume file or text -> draft profile (never saved here).
+profileRouter.use('/import', createImportRouter());
 
 // Only the profile content leaves the server. No _id, __v or userId.
 // The keys come from the zod schema, so the two cannot drift apart.
