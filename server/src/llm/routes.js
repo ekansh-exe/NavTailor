@@ -16,5 +16,7 @@ export const ROUTES = {
 // Fallback order per task kind.
 export const ORDER = {
   parse: ['gemini_flash', 'groq', 'gemini_flash_lite'],
+  // Reading a job description is the same kind of job as parsing a resume.
+  analyze: ['gemini_flash', 'groq', 'gemini_flash_lite'],
   rewrite: ['groq', 'gemini_flash', 'gemini_flash_lite'],
 };
