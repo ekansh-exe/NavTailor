@@ -9,6 +9,8 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { JOB_DESCRIPTION, analysis, profile } from './helpers/tailorFixtures.js';
 
+// These routers are tested for their own limits; the shared daily AI budget has its own test file.
+const noDailyLimit = (req, res, next) => next();
 
 const TEST_SECRET = 'test-secret-that-is-only-used-in-this-test-file-0123456789';
 const userA = new mongoose.Types.ObjectId().toString();
@@ -84,9 +86,9 @@ before(async () => {
   await mongoose.connect(mongod.getUri());
   await Profile.init();
 
-  base = await serve(appWith(createTailorRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 1000 })));
-  limitedBase = await serve(appWith(createTailorRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 2 })));
-  dbBase = await serve(appWith(createTailorRouter({ llm: fakeLLM, limit: 1000 })));
+  base = await serve(appWith(createTailorRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 1000, dailyLimiter: noDailyLimit })));
+  limitedBase = await serve(appWith(createTailorRouter({ llm: fakeLLM, loadProfile: fakeLoad, limit: 2, dailyLimiter: noDailyLimit })));
+  dbBase = await serve(appWith(createTailorRouter({ llm: fakeLLM, limit: 1000, dailyLimiter: noDailyLimit })));
   const { app } = await import('../src/app.js');
   appBase = await serve(app);
 });

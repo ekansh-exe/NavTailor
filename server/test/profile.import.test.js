@@ -10,6 +10,9 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { makePdf, makeDocx, makePlainZip } from './helpers/makeFiles.js';
 
+// These routers are tested for their own limits; the shared daily AI budget has its own test file.
+const noDailyLimit = (req, res, next) => next();
+
 const TEST_SECRET = 'test-secret-that-is-only-used-in-this-test-file-0123456789';
 const userId = new mongoose.Types.ObjectId().toString();
 const cookie = `session=${jwt.sign({ sub: userId }, TEST_SECRET, { algorithm: 'HS256', expiresIn: 3600 })}`;
@@ -78,7 +81,7 @@ before(async () => {
   app.use(express.json());
   app.use(cookieParser());
   // Mounted before the real profile router, with the fake LLM; GET /api/profile is the real one.
-  app.use('/api/profile/import', createImportRouter({ llm: fakeLLM, limit: 1000 }));
+  app.use('/api/profile/import', createImportRouter({ llm: fakeLLM, limit: 1000, dailyLimiter: noDailyLimit }));
   app.use('/api/profile', profileRouter);
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
@@ -86,7 +89,7 @@ before(async () => {
   const limitedApp = express();
   limitedApp.use(express.json());
   limitedApp.use(cookieParser());
-  limitedApp.use('/api/profile/import', createImportRouter({ llm: fakeLLM, limit: 2 }));
+  limitedApp.use('/api/profile/import', createImportRouter({ llm: fakeLLM, limit: 2, dailyLimiter: noDailyLimit }));
   limitedServer = limitedApp.listen(0);
   limitedBase = `http://127.0.0.1:${limitedServer.address().port}`;
 });

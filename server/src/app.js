@@ -12,7 +12,11 @@ import { createApplicationsRouter } from './routes/applications.js';
 
 export const app = express();
 
-// Security headers (no sniffing, no framing, etc.).
+// Behind a hosting proxy, req.ip would otherwise be the proxy's IP for every visitor.
+if (config.trustProxy) app.set('trust proxy', config.trustProxy);
+
+// Security headers with helmet's defaults: Content-Security-Policy, X-Content-Type-Options: nosniff,
+// X-Frame-Options (no framing), Strict-Transport-Security, Referrer-Policy, and no X-Powered-By.
 app.use(helmet());
 
 // Only our own client may call the API from a browser, and it may send cookies.
@@ -26,12 +30,13 @@ app.use(
   }),
 );
 
-// Parse JSON request bodies into req.body.
+// Parse JSON request bodies into req.body. Anything bigger than the limit is refused with 413 before
+// it is read into memory. File uploads are capped separately by multer (routes/profileImport.js).
 // Saving an application sends the whole signed tailoring result plus the job description back, which
 // can pass the default 100 kB. Only that path gets a bigger limit. The global parser below then sees
 // the body is already parsed and skips it.
 app.use('/api/applications', express.json({ limit: '400kb' }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 // Parse the Cookie header into req.cookies (needed to read our session cookie).
 app.use(cookieParser());
@@ -56,3 +61,18 @@ app.use('/api/applications', createApplicationsRouter());
 if (!config.isProduction) {
   app.use('/api/dev', createDevRouter());
 }
+
+// Errors from the JSON body parser. Without this, Express answers with an HTML error page, which the
+// client cannot read. Must be the LAST app.use and take four arguments, so Express treats it as an
+// error handler.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'That request is too large.', code: 'too_large' });
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'The request body is not valid JSON.', code: 'bad_json' });
+  }
+  console.error('unhandled error:', err?.name ?? 'Error');
+  return res.status(500).json({ error: 'Something went wrong', code: 'internal' });
+});

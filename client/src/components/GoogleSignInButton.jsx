@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiPost } from '../api/client.js';
+import { errorMessage } from '../lib/errors.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -25,12 +26,14 @@ function loadGisScript() {
 export default function GoogleSignInButton() {
   const buttonRef = useRef(null);
   const { signIn } = useAuth();
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
     // Google calls this with { credential } (the ID token) after the user signs in.
     async function handleCredential(response) {
+      setError('');
       try {
         // The server verifies the token, sets the session cookie and returns the public user.
         const data = await apiPost('/api/auth/google', { credential: response.credential });
@@ -38,6 +41,8 @@ export default function GoogleSignInButton() {
       } catch (err) {
         // Log the message only. Never log the credential (it is a login token).
         console.error('Google sign-in failed:', err.message);
+        // e.g. the per-IP sign-in limit (429): the server's message says to wait.
+        setError(errorMessage(err, { auth_rate_limited: err.data?.error }));
       }
     }
 
@@ -61,5 +66,15 @@ export default function GoogleSignInButton() {
     };
   }, [signIn]); // signIn is stable (useCallback with no deps), so this still runs once
 
-  return <div ref={buttonRef} />;
+  return (
+    <div>
+      <div ref={buttonRef} />
+      {/* role="alert": read out as soon as it appears. */}
+      {error && (
+        <p role="alert" className="mt-3 max-w-xs border-2 border-ink bg-alert px-3 py-2 font-mono text-xs">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }

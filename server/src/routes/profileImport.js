@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { callLLM } from '../llm/index.js';
 import { LLMError } from '../llm/errors.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { dailyAiLimiter as sharedDailyLimiter } from '../middleware/limits.js';
 import { profileSchema } from '../schemas/profile.js';
 import { detectType } from '../import/detectType.js';
 import { extractText, ExtractError } from '../import/extractText.js';
@@ -46,8 +47,9 @@ function receiveUpload(req, res, next) {
 const fail = (res, status, code, error, extra = {}) => res.status(status).json({ error, code, ...extra });
 
 // `llm` and `extract` are injectable so tests never call a real provider.
-// `limit` is injectable so a test can hit the rate limit in a few requests.
-export function createImportRouter({ llm = callLLM, extract = extractText, limit = 5 } = {}) {
+// `limit` and `dailyLimiter` are injectable so a test can hit a limit in a few requests.
+// The default dailyLimiter is the app-wide instance, shared with tailoring (one AI budget).
+export function createImportRouter({ llm = callLLM, extract = extractText, limit = 5, dailyLimiter = sharedDailyLimiter } = {}) {
   const router = Router();
 
   // Auth runs BEFORE multer, so an anonymous request never gets its upload parsed.
@@ -63,7 +65,8 @@ export function createImportRouter({ llm = callLLM, extract = extractText, limit
     handler: (req, res) => fail(res, 429, 'rate_limited', 'Too many imports, try again later'),
   });
 
-  router.post('/', limiter, receiveUpload, async (req, res) => {
+  // Both limits run before multer, so a user over budget never gets an upload parsed.
+  router.post('/', limiter, dailyLimiter, receiveUpload, async (req, res) => {
     // 1. Get raw text from a file or from the pasted body.
     let raw;
     if (req.file) {

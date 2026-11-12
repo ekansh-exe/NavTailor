@@ -24,6 +24,10 @@ export const config = {
   googleClientId: required('GOOGLE_CLIENT_ID'),
   // Signs our session JWTs. Anyone with it can forge logins. Never log this value.
   jwtSecret: required('JWT_SECRET'),
+  // How many proxies sit in front of the server (Render, Railway, nginx...). With 1, Express reads the
+  // real client IP from X-Forwarded-For, which the per-IP sign-in limit needs. Leave unset locally:
+  // trusting a header no proxy wrote would let a client pick its own IP.
+  trustProxy: Number(process.env.TRUST_PROXY) || 0,
   // Cookies get the Secure flag only in production (localhost dev runs over plain http).
   isProduction: process.env.NODE_ENV === 'production',
   llm: {

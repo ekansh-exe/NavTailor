@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { verifyGoogleCredential } from '../auth/google.js';
 import { clearSessionCookie, setSessionCookie } from '../auth/session.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { createAuthLimiter } from '../middleware/limits.js';
 
 export const authRouter = Router();
 
@@ -27,7 +28,10 @@ async function upsertUser(profile) {
   }
 }
 
-authRouter.post('/google', async (req, res) => {
+// Strict, per IP: each attempt makes a call to Google and can create a user.
+const authLimiter = createAuthLimiter();
+
+authRouter.post('/google', authLimiter, async (req, res) => {
   const credential = req.body?.credential;
   if (typeof credential !== 'string' || credential.length === 0) {
     return res.status(400).json({ error: 'Missing credential' });

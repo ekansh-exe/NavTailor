@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { callLLM } from '../llm/index.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { dailyAiLimiter as sharedDailyLimiter } from '../middleware/limits.js';
 import { loadSavedProfile } from '../profile/access.js';
 import { tailorForUser } from '../tailor/forUser.js';
 import { signResult } from '../tailor/saveToken.js';
@@ -24,8 +25,9 @@ const bodySchema = z.strictObject({ jobDescription: jobDescriptionSchema });
 const fail = (res, status, code, error, extra = {}) => res.status(status).json({ error, code, ...extra });
 
 // `llm` and `loadProfile` are injectable so tests never call a provider or need a database.
-// `limit` is injectable so a test can hit the rate limit in a few requests.
-export function createTailorRouter({ llm = callLLM, loadProfile = loadSavedProfile, limit = 10 } = {}) {
+// `limit` and `dailyLimiter` are injectable so a test can hit a limit in a few requests.
+// The default dailyLimiter is the app-wide instance, shared with profile import (one AI budget).
+export function createTailorRouter({ llm = callLLM, loadProfile = loadSavedProfile, limit = 10, dailyLimiter = sharedDailyLimiter } = {}) {
   const router = Router();
 
   // Applied to the whole router, so a route added later cannot forget the auth check.
@@ -41,7 +43,8 @@ export function createTailorRouter({ llm = callLLM, loadProfile = loadSavedProfi
     handler: (req, res) => fail(res, 429, 'rate_limited', 'Too many tailoring requests, try again in a few minutes'),
   });
 
-  router.post('/', limiter, async (req, res) => {
+  // The 10-minute limiter stops bursts; the daily one caps the whole day.
+  router.post('/', limiter, dailyLimiter, async (req, res) => {
     const body = bodySchema.safeParse(req.body);
     if (!body.success) {
       return fail(res, 400, 'bad_job_description', `Send { "jobDescription": "..." } with ${MIN_JD_CHARS} to ${MAX_JD_CHARS} characters`);
