@@ -1,0 +1,41 @@
+import { Button, ItemCard, Section, TextField } from './ui.jsx';
+import { LIMIT, newEducation, removeAt, setAt } from './model.js';
+
+export default function EducationSection({ items, onChange }) {
+  return (
+    <Section title="Education" tag={`${items.length}/${LIMIT.education}`}>
+      {items.map((edu, i) => (
+        <ItemCard
+          key={edu.id}
+          title={edu.school || `School ${i + 1}`}
+          onRemove={() => onChange(removeAt(items, i))}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField
+              label="School"
+              value={edu.school}
+              onChange={(school) => onChange(setAt(items, i, { school }))}
+              maxLength={LIMIT.short}
+            />
+            <TextField
+              label="Degree"
+              value={edu.degree}
+              onChange={(degree) => onChange(setAt(items, i, { degree }))}
+              maxLength={LIMIT.short}
+            />
+            <TextField
+              label="Dates"
+              placeholder="2021 – 2025"
+              value={edu.dates}
+              onChange={(dates) => onChange(setAt(items, i, { dates }))}
+              maxLength={LIMIT.dates}
+            />
+          </div>
+        </ItemCard>
+      ))}
+      <Button onClick={() => onChange([...items, newEducation()])} disabled={items.length >= LIMIT.education}>
+        + Add education
+      </Button>
+    </Section>
+  );
+}
