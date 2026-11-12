@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
@@ -16,5 +17,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.12.1",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.3.0"
   }
 }
