@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { config } from './config.js';
+import { authRouter } from './routes/auth.js';
 
 export const app = express();
 
@@ -26,3 +27,5 @@ app.use(cookieParser());
 app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
+
+app.use('/api/auth', authRouter);
