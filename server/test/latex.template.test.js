@@ -28,6 +28,7 @@ const profile = (overrides = {}) => ({
       company: 'Acme Corp',
       role: 'Software Engineer',
       dates: '2021 - 2024',
+      location: 'Remote',
       bullets: [
         { id: 'exp1_b1', text: '[Internal] Built a React dashboard used by 40 teams', skills: ['React'], alwaysInclude: false },
         { id: 'exp1_b2', text: 'Wrote Node.js services', skills: [], alwaysInclude: false },
@@ -38,6 +39,8 @@ const profile = (overrides = {}) => ({
     {
       id: 'proj1',
       name: 'NavTailor',
+      tagline: 'AI resume tailoring',
+      dates: 'Nov 2026',
       link: 'https://github.com/janedoe/navtailor',
       skills: ['React', 'Node.js'],
       bullets: [{ id: 'proj1_b1', text: 'Tailors resumes', skills: [] }],
@@ -45,6 +48,9 @@ const profile = (overrides = {}) => ({
   ],
   certifications: [{ id: 'cert1', name: 'AWS CCP', issuer: 'Amazon', year: '2023', skills: [] }],
   skills: { languages: ['JavaScript', 'C++'], frameworks: ['React'], tools: ['MongoDB'] },
+  achievements: [{ id: 'ach1', text: 'Winner, Smart India Hackathon among 500+ teams' }],
+  activitiesHeading: 'Leadership & Activities',
+  activities: [{ id: 'act1', title: 'Lead, Coding Club', detail: '2022 - 2023' }],
   ...overrides,
 });
 
@@ -76,6 +82,7 @@ function hostileProfile() {
         company: LONG,
         role: LONG,
         dates: SHORT,
+        location: LONG,
         bullets: [
           { id: 'exp1_b1', text: LONG, skills: [SHORT], alwaysInclude: false },
           { id: 'exp1_b2', text: `[${LONG}]`, skills: [], alwaysInclude: false },
@@ -83,10 +90,13 @@ function hostileProfile() {
       },
     ],
     projects: [
-      { id: 'proj1', name: LONG, link: HOSTILE_URL, skills: [SHORT, SHORT], bullets: [{ id: 'proj1_b1', text: LONG, skills: [] }] },
+      { id: 'proj1', name: LONG, tagline: LONG, dates: SHORT, link: HOSTILE_URL, skills: [SHORT, SHORT], bullets: [{ id: 'proj1_b1', text: LONG, skills: [] }] },
     ],
     certifications: [{ id: 'cert1', name: LONG, issuer: LONG, year: SHORT, skills: [SHORT] }],
     skills: { languages: [SHORT], frameworks: [SHORT], tools: [SHORT] },
+    achievements: [{ id: 'ach1', text: LONG }, { id: 'ach2', text: `[${SHORT}]` }],
+    activitiesHeading: SHORT,
+    activities: [{ id: 'act1', title: LONG, detail: LONG }],
   };
 }
 
@@ -94,10 +104,11 @@ function hostileProfile() {
 // plus what escapeLatex emits. Adding a command to the template means adding it here on purpose.
 const ALLOWED_WORDS = new Set([
   // template
-  '\\documentclass', '\\usepackage', '\\pagestyle', '\\setlength', '\\parindent', '\\parskip',
-  '\\emergencystretch', '\\titleformat', '\\titlespacing', '\\setlist', '\\begin', '\\end',
-  '\\section', '\\LARGE', '\\large', '\\bfseries', '\\titlerule', '\\textbf', '\\textit',
-  '\\textbar', '\\hfill', '\\par', '\\item', '\\relax', '\\href', '\\vspace',
+  '\\documentclass', '\\usepackage', '\\setmainfont', '\\pagestyle', '\\setlength', '\\parindent',
+  '\\parskip', '\\hyphenpenalty', '\\exhyphenpenalty', '\\raggedright', '\\titleformat',
+  '\\titlespacing', '\\MakeUppercase', '\\setlist', '\\circ', '\\textbullet', '\\begin', '\\end',
+  '\\section', '\\LARGE', '\\large', '\\small', '\\bfseries', '\\itshape', '\\titlerule',
+  '\\textbf', '\\textbar', '\\hfill', '\\hspace', '\\par', '\\item', '\\relax', '\\href', '\\vspace',
   // escapeLatex output
   '\\textbackslash', '\\textasciicircum', '\\textasciitilde', '\\textless', '\\textgreater',
 ]);
@@ -160,7 +171,7 @@ describe('renderResume: document', () => {
 
   test('standard section names, in the standard order', () => {
     const out = renderResume(profile());
-    const order = ['Summary', 'Experience', 'Projects', 'Education', 'Skills', 'Certifications'];
+    const order = ['Summary', 'Education', 'Work Experience', 'Projects', 'Leadership \\& Activities', 'Skills', 'Certifications', 'Achievements'];
     const positions = order.map((name) => out.indexOf(`\\section*{${name}}`));
     assert.ok(positions.every((p) => p >= 0), `missing a section: ${positions}`);
     assert.deepEqual([...positions].sort((a, b) => a - b), positions);
@@ -169,18 +180,26 @@ describe('renderResume: document', () => {
   test('a realistic profile is escaped and laid out as expected', () => {
     const out = renderResume(profile());
     assert.match(out, /Engineer who cut costs by 40\\% \\& saved \\\$2M\./);
-    assert.match(out, /jane\\_d@example\.com \\textbar\{\} \+1 \(555\) 010-2030 \\textbar\{\} Pune, IN/);
-    assert.match(out, /\\textbf\{Acme Corp\}\\hfill 2021 - 2024\\par/);
-    assert.match(out, /\\textit\{Software Engineer\}\\par/);
-    assert.match(out, /\\href\{https:\/\/github\.com\/janedoe\}\{github\.com\/janedoe\}/);
-    assert.match(out, /\\textbf\{Languages:\} JavaScript, C\+\+\\par/);
-    assert.match(out, /\\textit\{B\.Sc\. Computer Science, 8\.7\/10 CGPA\}/);
-    assert.match(out, /\\textbf\{AWS CCP\}, Amazon\\hfill 2023\\par/);
+    const sep = String.raw`\hspace{0.8em}\textbar{}\hspace{0.8em}`;
+    assert.ok(out.includes(`jane\\_d@example.com${sep}+1 (555) 010-2030${sep}Pune, IN\\par`));
+    // links get their own centered line
+    assert.ok(out.includes(`\\href{https://github.com/janedoe}{github.com/janedoe}${sep}\\href{https://www.jane.dev/}{jane.dev}\\par`));
+    assert.ok(out.includes('\\textbf{Acme Corp}\\hfill 2021 - 2024\\par'));
+    assert.ok(out.includes('{\\itshape\\small Software Engineer}\\hfill{\\itshape\\small Remote}\\par'));
+    assert.ok(out.includes('\\textbf{State University}\\hfill 2017 - 2021\\par'));
+    assert.ok(out.includes('{\\itshape\\small B.Sc. Computer Science}\\hfill{\\itshape\\small 8.7/10 CGPA}\\par'));
+    assert.ok(out.includes('\\textbf{NavTailor -- AI resume tailoring}\\hfill Nov 2026\\par'));
+    assert.ok(out.includes('{\\itshape\\small React, Node.js}\\hfill{\\itshape\\small \\href{https://github.com/janedoe/navtailor}{github.com/janedoe/navtailor}}\\par'));
+    assert.ok(out.includes('\\textbf{Programming Languages:} JavaScript, C++\\par'));
+    assert.ok(out.includes('\\textbf{Frameworks \\& Libraries:} React\\par'));
+    assert.ok(out.includes('\\textbf{AWS CCP}, Amazon\\hfill 2023\\par'));
+    assert.ok(out.includes('\\section*{Leadership \\& Activities}\nLead, Coding Club\\hfill 2022 - 2023\\par'));
+    assert.ok(out.includes('\\item\\relax Winner, Smart India Hackathon among 500+ teams'));
   });
 
   test('a bullet starting with "[" cannot be read as the optional argument of \\item', () => {
     const out = renderResume(profile());
-    assert.ok(out.includes('\\item\\relax [Internal] Built a React dashboard'));
+    assert.ok(out.includes('\\item\\relax\\small [Internal] Built a React dashboard'));
     assert.ok(!/\\item\s*\[/.test(out));
   });
 
@@ -221,6 +240,11 @@ describe('renderResume: ATS-friendly rules', () => {
   test('dates share a line with the entry (hfill), not a table cell', () => {
     assert.match(renderResume(profile()), /\\textbf\{State University\}\\hfill 2017 - 2021/);
   });
+  test('section titles are real uppercase text, not small caps (small caps extract as "EDUCATiON")', () => {
+    const out = renderResume(profile());
+    assert.ok(out.includes('\\MakeUppercase'));
+    assert.ok(!out.includes('scshape'));
+  });
 });
 
 describe('renderResume: empty and partial data', () => {
@@ -230,7 +254,7 @@ describe('renderResume: empty and partial data', () => {
     p.skills.tools = ['Git'];
     const out = renderResume(p);
     assert.ok(out.includes('\\section*{Skills}'));
-    for (const name of ['Summary', 'Experience', 'Projects', 'Education', 'Certifications']) {
+    for (const name of ['Summary', 'Work Experience', 'Projects', 'Education', 'Certifications', 'Achievements', 'Activities']) {
       assert.ok(!out.includes(`\\section*{${name}}`), name);
     }
   });
@@ -258,7 +282,8 @@ describe('renderResume: empty and partial data', () => {
     p.basics.phone = '';
     p.basics.links = [];
     const out = renderResume(p);
-    assert.ok(out.includes('jane\\_d@example.com \\textbar{} Pune, IN\\par'));
+    assert.ok(out.includes('jane\\_d@example.com\\hspace{0.8em}\\textbar{}\\hspace{0.8em}Pune, IN\\par'));
+    assert.ok(!out.includes('\\href{https://github.com/janedoe}'), 'no links line');
   });
 
   test('a job without bullets gets no itemize (an empty list is a LaTeX error)', () => {
@@ -266,8 +291,8 @@ describe('renderResume: empty and partial data', () => {
     p.experience[0].bullets = [];
     const out = renderResume(p);
     assert.ok(out.includes('Acme Corp'));
-    // only the project still has a list
-    assert.equal(count(out, '\\begin{itemize}'), 1);
+    // only the project and the achievements still have a list
+    assert.equal(count(out, '\\begin{itemize}'), 2);
   });
 
   test('every itemize has at least one item', () => {
@@ -286,6 +311,40 @@ describe('renderResume: empty and partial data', () => {
     const out = renderResume(p);
     assert.ok(!out.includes('\\section*{Experience}'));
     assert.ok(!out.includes('\\section*{Certifications}'));
+  });
+});
+
+describe('renderResume: optional fields', () => {
+  test('a job without location and a project without dates, tagline or link leave no stray hfill', () => {
+    const p = profile();
+    p.experience[0].location = '';
+    Object.assign(p.projects[0], { tagline: '', dates: '', link: '' });
+    const out = renderResume(p);
+    assert.ok(out.includes('{\\itshape\\small Software Engineer}\\par'));
+    assert.ok(out.includes('\\textbf{NavTailor}\\par'));
+    assert.ok(out.includes('{\\itshape\\small React, Node.js}\\par'));
+  });
+  test('profiles saved before the optional fields existed still render', () => {
+    const p = profile();
+    delete p.experience[0].location;
+    delete p.projects[0].tagline;
+    delete p.projects[0].dates;
+    delete p.achievements;
+    delete p.activities;
+    delete p.activitiesHeading;
+    const out = renderResume(p);
+    assert.ok(out.includes('\\section*{Work Experience}'));
+    assert.ok(!out.includes('\\section*{Achievements}'));
+  });
+  test('activities without a heading use "Activities"; an activity without a title is skipped', () => {
+    const p = profile({ activitiesHeading: '  ', activities: [{ id: 'a1', title: 'Volunteer', detail: '' }, { id: 'a2', title: '', detail: '2020' }] });
+    const out = renderResume(p);
+    assert.ok(out.includes('\\section*{Activities}\nVolunteer\\par'));
+    assert.ok(!out.includes('2020'));
+  });
+  test('achievement and activity ids join the profile-wide uniqueness rule', () => {
+    assert.throws(() => renderResume(profile({ achievements: [{ id: 'exp1', text: 'x' }] })));
+    assert.throws(() => renderResume(profile({ activities: [{ id: 'cert1', title: 'x', detail: '' }] })));
   });
 });
 
@@ -366,7 +425,7 @@ describe('renderResume: every field carries an attack', () => {
     p.experience[0].bullets[0].text = 'a\n\nb';
     const result = renderResume(p);
     assert.ok(result.includes('line one line two'));
-    assert.ok(result.includes('\\item\\relax a b'));
+    assert.ok(result.includes('\\item\\relax\\small a b'));
   });
 });
 

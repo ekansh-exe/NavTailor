@@ -19,6 +19,9 @@ function sources(p, { renderedOnly }) {
   for (const job of p.experience) for (const b of job.bullets) { texts.push(b.text); if (!renderedOnly) tags.push(...b.skills); }
   for (const proj of p.projects) for (const b of proj.bullets) { texts.push(b.text); if (!renderedOnly) tags.push(...b.skills); }
   for (const c of p.certifications) { texts.push(`${c.name} ${c.issuer}`); if (!renderedOnly) tags.push(...c.skills); }
+  // Printed as they are on every resume (never selected or rewritten).
+  // (?? because these optional fields are missing on profiles saved before they existed.)
+  texts.push(...p.projects.map((x) => x.tagline ?? ''), ...(p.achievements ?? []).map((a) => a.text), ...(p.activities ?? []).map((a) => a.title));
   return { tags, texts };
 }
 
