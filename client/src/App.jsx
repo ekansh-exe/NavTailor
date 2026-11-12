@@ -36,6 +36,9 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="new" element={<NewTailoringPage />} />
+          {/* An unsaved result from POST /api/tailor, carried in router state. A static path wins over
+              result/:id, so "draft" is never read as an application id. */}
+          <Route path="result/draft" element={<ResultPage draft />} />
           <Route path="result/:id" element={<ResultPage />} />
         </Route>
       </Route>

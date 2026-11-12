@@ -55,17 +55,19 @@ export default function NewTailoringPage() {
     setSubmitting(true);
     setError(null);
     try {
-      // The server tailors AND saves, then answers with the new application's id.
-      const { id } = await apiPost('/api/applications', { company, role, jobDescription });
-      navigate(`/app/result/${id}`);
+      // The server tailors but SAVES NOTHING. The result (and the token that lets the server trust it
+      // again later) travels to the result page in router state; Save there creates the application.
+      const { saveToken, ...result } = await apiPost('/api/tailor', { jobDescription });
+      navigate('/app/result/draft', {
+        state: { company: company.trim(), role: role.trim(), jdText: jobDescription.trim(), result, saveToken },
+      });
     } catch (err) {
       setError({
         code: err.data?.code,
         message: errorMessage(err, {
           no_profile: 'You have no saved profile yet. Fill it in first.',
           empty_profile: 'Your profile is empty. Add your experience first.',
-          too_many_applications: err.data?.error,
-          bad_application: `Fill in the company and role, and paste a job description of ${MIN_JD} to ${MAX_JD.toLocaleString()} characters.`,
+          bad_job_description: `Paste a job description of ${MIN_JD} to ${MAX_JD.toLocaleString()} characters.`,
         }),
       });
       setSubmitting(false);
