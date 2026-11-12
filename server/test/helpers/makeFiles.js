@@ -65,3 +65,24 @@ export async function makeManyEntriesDocx(count = 1200) {
   for (let i = 0; i < count; i++) zip.file(`junk/${i}.txt`, 'x');
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
+
+// A valid PDF with `n` blank pages, for page-count tests. Offsets in the xref table are exact.
+export function makePdfPages(n) {
+  const kids = Array.from({ length: n }, (_, i) => `${i + 3} 0 R`).join(' ');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${kids}] /Count ${n} >>`,
+    ...Array.from({ length: n }, () => '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>'),
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf, 'latin1');
+}
