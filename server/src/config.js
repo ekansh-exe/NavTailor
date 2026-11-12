@@ -20,4 +20,10 @@ export const config = {
   clientOrigin: required('CLIENT_ORIGIN').replace(/\/+$/, ''),
   // Contains the DB password. Never log this value.
   mongodbUri: required('MONGODB_URI'),
+  // Public identifier of our Google app. The ID token must be issued for this audience.
+  googleClientId: required('GOOGLE_CLIENT_ID'),
+  // Signs our session JWTs. Anyone with it can forge logins. Never log this value.
+  jwtSecret: required('JWT_SECRET'),
+  // Cookies get the Secure flag only in production (localhost dev runs over plain http).
+  isProduction: process.env.NODE_ENV === 'production',
 };
