@@ -30,6 +30,14 @@ export default function EducationSection({ items, onChange }) {
               onChange={(dates) => onChange(setAt(items, i, { dates }))}
               maxLength={LIMIT.dates}
             />
+            <TextField
+              label="Grade"
+              placeholder="8.7 / 10 CGPA"
+              // ?? '' because profiles saved before this field existed may not carry it yet.
+              value={edu.grade ?? ''}
+              onChange={(grade) => onChange(setAt(items, i, { grade }))}
+              maxLength={LIMIT.grade}
+            />
           </div>
         </ItemCard>
       ))}

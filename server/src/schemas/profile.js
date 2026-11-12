@@ -10,6 +10,7 @@ const LIMIT = {
   tag: 60, // a skill name, e.g. "React"
   short: 200, // names, titles, schools, locations...
   dates: 60,
+  grade: 60, // free text on purpose: "8.7 / 10 CGPA", "3.8 GPA", "First Class", "85%"
   year: 20,
   phone: 40,
   email: 254,
@@ -60,6 +61,8 @@ export const educationItemSchema = z.strictObject({
   school: text(LIMIT.short),
   degree: text(LIMIT.short),
   dates: text(LIMIT.dates),
+  // Optional: text() defaults to "", so profiles saved before this field existed still validate.
+  grade: text(LIMIT.grade),
 });
 
 export const experienceBulletSchema = z.strictObject({

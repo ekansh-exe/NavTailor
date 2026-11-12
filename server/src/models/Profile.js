@@ -16,7 +16,8 @@ const itemId = { type: String, required: true, trim: true };
 const subdoc = { _id: false };
 
 const educationSchema = new Schema(
-  { id: itemId, school: text, degree: text, dates: text },
+  // grade was added later: older stored items have no grade, and Mongoose fills "" when it reads them.
+  { id: itemId, school: text, degree: text, dates: text, grade: text },
   subdoc,
 );
 

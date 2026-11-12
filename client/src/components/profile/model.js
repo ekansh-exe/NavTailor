@@ -7,6 +7,7 @@ export const LIMIT = {
   tag: 60,
   short: 200,
   dates: 60,
+  grade: 60,
   year: 20,
   phone: 40,
   email: 254,
@@ -31,7 +32,7 @@ export function newId(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export const newEducation = () => ({ id: newId('edu'), school: '', degree: '', dates: '' });
+export const newEducation = () => ({ id: newId('edu'), school: '', degree: '', dates: '', grade: '' });
 
 export const newExperienceBullet = () => ({
   id: newId('b'),
