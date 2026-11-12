@@ -2,6 +2,8 @@
 // (file type by magic bytes, size, minimum text). The client copies are only there so the
 // user hears about a problem before waiting on an upload.
 
+import { errorMessage } from '../../lib/errors.js';
+
 export const MAX_FILE_BYTES = 2 * 1024 * 1024; // same 2 MB cap as the server
 export const MIN_TEXT_CHARS = 100; // below this we treat the text as "almost nothing"
 export const MAX_PASTE_CHARS = 30_000;
@@ -40,14 +42,15 @@ export function describeImportError(err) {
 
   if (status === 422 && code === 'too_little_text') return tooLittle(Number(err.data.chars) || 0, 'file');
   if (status === 422) return { code: 'no_text', message: 'We could not read any text from that file.', offerPaste: true };
-  if (status === 401) return { code: 'auth', message: 'Your session expired. Sign in again, then retry.' };
+  if (err?.network) return { code: 'network', message: errorMessage(err) };
+  if (status === 401) return { code: 'auth', message: errorMessage(err) };
   // The URL itself was not found: the running server is older than this page, or the proxy is
   // pointing at the wrong place. It is not a problem with the file.
   if (status === 404) return { code: 'no_route', message: 'The server does not have the import feature. Restart the API server (npm run dev in server/) and try again.' };
   if (status === 413) return { code: 'too_big', message: 'That file is over the 2 MB limit.' };
   if (status === 415) return { code: 'bad_type', message: 'That is not a real PDF or DOCX file. Check the file and try again.' };
-  if (status === 429) return { code: 'rate', message: 'Too many imports. Wait a few minutes, then try again.' };
-  if (status === 502) return { code: 'llm', message: 'The AI service could not parse the resume right now. Try again in a minute.' };
+  if (status === 429) return { code: 'rate', message: errorMessage(err) };
+  if (status === 502) return { code: 'llm', message: 'The AI service could not read the resume right now. Wait a minute and try again. Your profile was not changed.' };
   if (status === 400) return { code: 'bad_request', message: 'The server rejected that input. Check the file or text and try again.' };
   if (status === undefined) return { code: 'network', message: 'Could not reach the server. Check your connection and try again.' };
   return { code: 'unknown', message: 'Import failed. Your profile was not changed.' };

@@ -8,7 +8,7 @@ const byGroup = (a, b) => GROUP_ORDER[a.group] - GROUP_ORDER[b.group];
 function Chip({ term, group, tone, note }) {
   const tones = {
     matched: 'bg-cream',
-    offPage: 'bg-cream text-ink/60',
+    offPage: 'bg-cream text-ink/70',
     missing: 'bg-alert',
   };
   return (
@@ -42,14 +42,14 @@ export default function GapReport({ gapReport, questions, resume }) {
         </div>
 
         <div className="space-y-6 p-6">
-          <h3 id="gap-title" className="text-xl">
+          <h2 id="gap-title" className="text-xl">
             Gap report
-          </h3>
+          </h2>
 
           <div>
-            <h4 className="mb-2 font-mono text-xs font-bold uppercase">
+            <h3 className="mb-2 font-mono text-xs font-bold uppercase">
               Matched ({matched.length})
-            </h4>
+            </h3>
             {matched.length ? (
               <ul className="flex flex-wrap gap-2">
                 {[...matched].sort(byGroup).map((m) => (
@@ -68,9 +68,9 @@ export default function GapReport({ gapReport, questions, resume }) {
           </div>
 
           <div>
-            <h4 className="mb-2 font-mono text-xs font-bold uppercase">
+            <h3 className="mb-2 font-mono text-xs font-bold uppercase">
               Missing ({missing.length})
-            </h4>
+            </h3>
             {missing.length ? (
               <>
                 <ul className="flex flex-wrap gap-2">
@@ -90,12 +90,15 @@ export default function GapReport({ gapReport, questions, resume }) {
         </div>
       </div>
 
-      {questions.length > 0 && (
-        <div className="border-t-2 border-ink p-6">
-          <h4 className="mb-3 flex items-center gap-2 font-mono text-xs font-bold uppercase">
-            <CircleHelp size={14} strokeWidth={2.5} aria-hidden="true" />
-            Add a number to make these stronger
-          </h4>
+      <div className="border-t-2 border-ink p-6">
+        <h3 className="mb-3 flex items-center gap-2 font-mono text-xs font-bold uppercase">
+          <CircleHelp size={14} strokeWidth={2.5} aria-hidden="true" />
+          Add a number to make these stronger
+        </h3>
+        {questions.length === 0 ? (
+          <p className="font-mono text-sm">Every bullet on this resume already has a number. Nothing to add.</p>
+        ) : (
+          <>
           <ul className="space-y-3">
             {questions.map((q) => (
               <li key={q.itemId} className="border-2 border-ink p-3 text-sm">
@@ -107,8 +110,9 @@ export default function GapReport({ gapReport, questions, resume }) {
           <p className="mt-3 font-mono text-xs">
             Answers go in your profile, never straight onto this resume.
           </p>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </section>
   );
 }

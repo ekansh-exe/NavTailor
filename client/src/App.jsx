@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router';
 import Header from './components/Header.jsx';
+import SkipLink from './components/SkipLink.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import GuestOnlyRoute from './components/GuestOnlyRoute.jsx';
 import AppShell from './components/AppShell.jsx';
@@ -21,6 +22,7 @@ export default function App() {
           path="/"
           element={
             <div className="min-h-screen">
+              <SkipLink />
               <Header />
               <LandingPage />
             </div>

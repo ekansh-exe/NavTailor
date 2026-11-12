@@ -1,4 +1,5 @@
-import { Button, Section, TextArea, TextField } from './ui.jsx';
+import { EmptyNote } from '../ui/Status.jsx';
+import { Button, Section, TextArea, TextField, removeKeepingFocus } from './ui.jsx';
 import { LIMIT, removeAt } from './model.js';
 
 // Contact details, links and the summary. `basics` is one object (not a list), and
@@ -37,10 +38,11 @@ export default function BasicsSection({ basics, summary, onBasicsChange, onSumma
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2" data-list>
         <span className="block font-mono text-xs uppercase">
           Links ({basics.links.length}/{LIMIT.links})
         </span>
+        {basics.links.length === 0 && <EmptyNote>No links yet. GitHub, LinkedIn or a portfolio work well.</EmptyNote>}
         {basics.links.map((url, i) => (
           // Index keys are fine here: rows are plain strings with no identity of their own.
           <div key={i} className="flex items-end gap-2">
@@ -55,7 +57,7 @@ export default function BasicsSection({ basics, summary, onBasicsChange, onSumma
             />
             <Button
               variant="danger"
-              onClick={() => set({ links: removeAt(basics.links, i) })}
+              onClick={(e) => removeKeepingFocus(e, () => set({ links: removeAt(basics.links, i) }))}
               aria-label={`Remove link ${i + 1}`}
             >
               Remove
@@ -63,8 +65,9 @@ export default function BasicsSection({ basics, summary, onBasicsChange, onSumma
           </div>
         ))}
         <Button
+          data-add
           onClick={() => set({ links: [...basics.links, ''] })}
-          disabled={basics.links.length >= LIMIT.links}
+          softDisabled={basics.links.length >= LIMIT.links}
         >
           + Add link
         </Button>

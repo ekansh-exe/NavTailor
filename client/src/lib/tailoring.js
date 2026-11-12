@@ -58,15 +58,6 @@ export const BLOCK_REASON = {
   empty: 'The rewrite was empty',
 };
 
-// Turns an API error into one sentence for the user. `byCode` overrides per page.
-export function errorMessage(err, byCode = {}) {
-  const code = err?.data?.code;
-  if (code && byCode[code]) return byCode[code];
-  if (err?.status === 401) return 'Your session expired. Sign in again.';
-  if (err?.status === 429) return err.data?.error ?? 'Too many requests. Wait a few minutes and try again.';
-  return err?.data?.error ?? 'Something went wrong. Try again.';
-}
-
 // Saves a Blob as a file. The temporary blob: URL is revoked once the download has had time to start
 // (revoking in the same tick can cancel it in some browsers).
 export function saveBlob(blob, filename) {

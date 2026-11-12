@@ -44,4 +44,18 @@
   h3 {
     @apply font-heading font-extrabold uppercase;
   }
+
+  /* One focus ring for every button, link and control, in the brutalist style: thick, black,
+     square, offset so it also shows around black buttons. :focus-visible = keyboard focus only,
+     so mouse clicks do not leave a ring behind. Text inputs keep their own hard-shadow style. */
+  :focus-visible {
+    outline: 3px solid var(--color-ink);
+    outline-offset: 3px;
+  }
+
+  /* Elements focused by code (a heading after navigation, an error box) get a quieter ring. */
+  [tabindex='-1']:focus-visible {
+    outline-offset: 2px;
+    outline-style: dashed;
+  }
 }

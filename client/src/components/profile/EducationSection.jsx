@@ -1,9 +1,11 @@
+import { EmptyNote } from '../ui/Status.jsx';
 import { Button, ItemCard, Section, TextField } from './ui.jsx';
 import { LIMIT, newEducation, removeAt, setAt } from './model.js';
 
 export default function EducationSection({ items, onChange }) {
   return (
     <Section title="Education" tag={`${items.length}/${LIMIT.education}`}>
+      {items.length === 0 && <EmptyNote>No education added yet.</EmptyNote>}
       {items.map((edu, i) => (
         <ItemCard
           key={edu.id}
@@ -41,7 +43,8 @@ export default function EducationSection({ items, onChange }) {
           </div>
         </ItemCard>
       ))}
-      <Button onClick={() => onChange([...items, newEducation()])} disabled={items.length >= LIMIT.education}>
+      <Button
+        data-add onClick={() => onChange([...items, newEducation()])} softDisabled={items.length >= LIMIT.education}>
         + Add education
       </Button>
     </Section>

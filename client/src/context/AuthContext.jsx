@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiGet, apiPost } from '../api/client.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { apiGet, apiPost, setUnauthorizedHandler } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -7,6 +7,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   // true until /me answers, so a logged-in user never sees a "logged out" flash on refresh.
   const [loading, setLoading] = useState(true);
+  // The cookie expired while the app was open. We KEEP `user` set, so ProtectedRoute does not
+  // redirect and the page (with any unsaved edits) stays mounted. A banner asks to sign in again.
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  // The 401 handler is registered once, so it reads the current user through a ref.
+  const userRef = useRef(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // On page load, ask the server who we are. The httpOnly cookie is invisible to
   // JavaScript, so asking /me is the only way to know. The browser attaches the cookie.
@@ -30,17 +39,42 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Any non-auth API call that gets a 401 lands here (see api/client.js).
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (userRef.current) setSessionExpired(true);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  // Called by the Google button after POST /api/auth/google succeeds.
+  const signIn = useCallback((nextUser) => {
+    const previous = userRef.current;
+    if (previous && previous.id !== nextUser.id) {
+      // A DIFFERENT account signed in on the expired-session banner. The page in memory holds the
+      // previous account's data, so a full reload is the only safe way to drop it.
+      window.location.assign('/app');
+      return;
+    }
+    setUser(nextUser);
+    setSessionExpired(false);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiPost('/api/auth/logout', {});
       setUser(null);
+      setSessionExpired(false);
     } catch (err) {
       // Keep the user shown as logged in: the server cookie was not cleared.
       console.error('Logout failed:', err.message);
     }
   }, []);
 
-  const value = useMemo(() => ({ user, loading, setUser, logout }), [user, loading, logout]);
+  const value = useMemo(
+    () => ({ user, loading, sessionExpired, signIn, logout }),
+    [user, loading, sessionExpired, signIn, logout],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

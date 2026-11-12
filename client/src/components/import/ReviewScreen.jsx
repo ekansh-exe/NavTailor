@@ -3,6 +3,7 @@ import { apiPut } from '../../api/client.js';
 import ProfileForm from '../profile/ProfileForm.jsx';
 import { Button, Toggle } from '../profile/ui.jsx';
 import { cleanForSave, formatIssuePath } from '../profile/model.js';
+import { errorMessage } from '../../lib/errors.js';
 
 // Step 2 of the import: the parsed draft in the normal profile form. Nothing is saved until
 // the user presses Save, and Save uses the same PUT /api/profile (same server validation).
@@ -28,10 +29,8 @@ export default function ReviewScreen({ initialDraft, warnings, replacesExisting,
     } catch (err) {
       if (err.status === 400 && Array.isArray(err.data?.issues)) {
         setError({ message: 'Fix these fields and save again:', issues: err.data.issues });
-      } else if (err.status === 401) {
-        setError({ message: 'Your session expired. Sign in again, then save.' });
       } else {
-        setError({ message: 'Could not save. Your edits are still here, try again.' });
+        setError({ message: `Not saved. ${errorMessage(err)}` });
       }
     } finally {
       setSaving(false);
@@ -41,7 +40,7 @@ export default function ReviewScreen({ initialDraft, warnings, replacesExisting,
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-3xl">Review import</h2>
+        <h1 className="text-3xl">Review import</h1>
         <span className="border-2 border-ink px-2 py-1 font-mono text-xs uppercase">Draft: not saved yet</span>
       </div>
 
@@ -90,7 +89,7 @@ export default function ReviewScreen({ initialDraft, warnings, replacesExisting,
           <Button variant="danger" onClick={onDiscard} disabled={saving}>
             Discard import
           </Button>
-          <Button variant="primary" onClick={save} disabled={saving || !confirmed}>
+          <Button variant="primary" onClick={save} busy={saving} softDisabled={!confirmed}>
             {saving ? 'Saving...' : 'Save profile'}
           </Button>
         </div>

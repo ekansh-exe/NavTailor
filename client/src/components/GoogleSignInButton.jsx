@@ -24,7 +24,7 @@ function loadGisScript() {
 
 export default function GoogleSignInButton() {
   const buttonRef = useRef(null);
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -34,7 +34,7 @@ export default function GoogleSignInButton() {
       try {
         // The server verifies the token, sets the session cookie and returns the public user.
         const data = await apiPost('/api/auth/google', { credential: response.credential });
-        setUser(data.user);
+        signIn(data.user);
       } catch (err) {
         // Log the message only. Never log the credential (it is a login token).
         console.error('Google sign-in failed:', err.message);
@@ -59,7 +59,7 @@ export default function GoogleSignInButton() {
     return () => {
       cancelled = true;
     };
-  }, [setUser]); // setUser is stable, so this still runs once
+  }, [signIn]); // signIn is stable (useCallback with no deps), so this still runs once
 
   return <div ref={buttonRef} />;
 }

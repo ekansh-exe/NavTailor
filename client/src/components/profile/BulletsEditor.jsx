@@ -1,3 +1,4 @@
+import { EmptyNote } from '../ui/Status.jsx';
 import { Button, ItemCard, TagInput, TextArea, Toggle } from './ui.jsx';
 import { LIMIT, removeAt, setAt } from './model.js';
 
@@ -5,7 +6,10 @@ import { LIMIT, removeAt, setAt } from './model.js';
 // skills each bullet shows off, and (jobs only) flag a bullet as "always include".
 export default function BulletsEditor({ bullets, onChange, max, makeBullet, showAlwaysInclude }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-list>
+      {bullets.length === 0 && (
+        <EmptyNote>No bullets yet. Each bullet is one thing you did; the tailoring picks the best ones per job.</EmptyNote>
+      )}
       {bullets.map((bullet, i) => (
         <ItemCard
           key={bullet.id}
@@ -33,7 +37,7 @@ export default function BulletsEditor({ bullets, onChange, max, makeBullet, show
           )}
         </ItemCard>
       ))}
-      <Button onClick={() => onChange([...bullets, makeBullet()])} disabled={bullets.length >= max}>
+      <Button data-add onClick={() => onChange([...bullets, makeBullet()])} softDisabled={bullets.length >= max}>
         + Add bullet
       </Button>
     </div>

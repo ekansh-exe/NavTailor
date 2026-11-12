@@ -1,9 +1,11 @@
+import { EmptyNote } from '../ui/Status.jsx';
 import { Button, ItemCard, Section, TagInput, TextField } from './ui.jsx';
 import { LIMIT, newCertification, removeAt, setAt } from './model.js';
 
 export default function CertificationsSection({ items, onChange }) {
   return (
     <Section title="Certifications" tag={`${items.length}/${LIMIT.certifications}`}>
+      {items.length === 0 && <EmptyNote>No certifications yet. Optional: add one only if it matters for the jobs you want.</EmptyNote>}
       {items.map((cert, i) => (
         <ItemCard
           key={cert.id}
@@ -39,8 +41,9 @@ export default function CertificationsSection({ items, onChange }) {
         </ItemCard>
       ))}
       <Button
+        data-add
         onClick={() => onChange([...items, newCertification()])}
-        disabled={items.length >= LIMIT.certifications}
+        softDisabled={items.length >= LIMIT.certifications}
       >
         + Add certification
       </Button>

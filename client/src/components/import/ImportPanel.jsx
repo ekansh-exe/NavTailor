@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { apiPost, apiUpload } from '../../api/client.js';
 import { Button, Section, TextArea } from '../profile/ui.jsx';
+import { ErrorBox, Spinner } from '../ui/Status.jsx';
 import ReviewScreen from './ReviewScreen.jsx';
 import {
   MAX_PASTE_CHARS,
@@ -67,12 +68,12 @@ export default function ImportPanel({ replacesExisting, onCancel, onSaved }) {
     );
   }
 
-  const canSubmit = !busy && (mode === 'file' ? file !== null : text.trim().length > 0);
+  const hasInput = mode === 'file' ? file !== null : text.trim().length > 0;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-3xl">Import from resume</h2>
+        <h1 className="text-3xl">Import from resume</h1>
         <Button onClick={onCancel} disabled={busy}>
           Back to profile
         </Button>
@@ -154,8 +155,8 @@ export default function ImportPanel({ replacesExisting, onCancel, onSaved }) {
         )}
 
         {error && (
-          <div role="alert" className="border-2 border-ink bg-alert p-4 shadow-hard">
-            <p className="font-mono text-sm font-bold">{error.message}</p>
+          // focus: the error appears after pressing Parse, so keyboard focus moves onto it.
+          <ErrorBox message={error.message} focus>
             {error.offerPaste && (
               <Button
                 className="mt-3"
@@ -167,14 +168,15 @@ export default function ImportPanel({ replacesExisting, onCancel, onSaved }) {
                 Paste text instead
               </Button>
             )}
-          </div>
+          </ErrorBox>
         )}
 
         <div className="flex items-center justify-between gap-4">
-          <span className="font-mono text-xs uppercase" role="status">
+          <span className="flex items-center gap-2 font-mono text-xs uppercase" role="status">
+            {busy && <Spinner size={14} />}
             {busy ? 'Reading your resume. This can take up to a minute...' : 'Nothing is saved yet'}
           </span>
-          <Button variant="primary" onClick={submit} disabled={!canSubmit}>
+          <Button variant="primary" onClick={submit} busy={busy} softDisabled={!hasInput}>
             {busy ? 'Parsing...' : 'Parse resume'}
           </Button>
         </div>

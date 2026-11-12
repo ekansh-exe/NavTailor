@@ -8,6 +8,7 @@ import {
   SplitSquareHorizontal,
 } from 'lucide-react';
 import GoogleSignInButton from '../components/GoogleSignInButton.jsx';
+import SkipLink from '../components/SkipLink.jsx';
 
 // Every claim here describes something the app really does. Keep it that way.
 const FEATURES = [
@@ -54,7 +55,7 @@ const MARQUEE_ITEMS = [
 
 export default function LandingPage() {
   return (
-    <main>
+    <main id="main" tabIndex={-1} className="focus:outline-none">
       <Hero />
       <Marquee />
       <FeatureGrid />
@@ -70,13 +71,13 @@ function Hero() {
         Resume tailoring, minus the guesswork
       </span>
 
-      <h2 className="mt-8 text-5xl leading-[0.95] tracking-tight sm:text-7xl">
+      <h1 className="mt-8 text-5xl leading-[0.95] tracking-tight sm:text-7xl">
         One profile.
         <br />
         Every job.
         <br />
         Zero fiction.
-      </h2>
+      </h1>
 
       <p className="mt-8 max-w-2xl text-lg">
         Keep a single master profile. Paste a job description. NavTailor picks your most relevant

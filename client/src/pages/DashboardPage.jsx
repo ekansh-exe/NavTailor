@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowRight, FolderOpen, Plus } from 'lucide-react';
 import { apiGet } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
-import { errorMessage } from '../lib/tailoring.js';
+import { ErrorBox, Loading } from '../components/ui/Status.jsx';
+import { errorMessage } from '../lib/errors.js';
 
 const PRIMARY_LINK =
   'inline-flex items-center gap-2 border-2 border-ink bg-ink px-4 py-2 font-mono text-xs font-bold uppercase text-cream shadow-hard active:translate-x-1 active:translate-y-1 active:shadow-none';
@@ -19,7 +20,7 @@ function EmptyState() {
       <div className="inline-flex border-2 border-ink bg-alert p-2">
         <FolderOpen size={22} strokeWidth={2.5} aria-hidden="true" />
       </div>
-      <h3 className="mt-4 text-xl">No applications yet</h3>
+      <h2 className="mt-4 text-xl">No applications yet</h2>
       <p className="mt-2 max-w-xl text-sm">
         Each resume you tailor will appear here with its company, role and status.
       </p>
@@ -51,7 +52,7 @@ function ApplicationRow({ app }) {
     <li>
       <Link
         to={`/app/result/${app.id}`}
-        className="group grid grid-cols-[1fr_auto] items-center gap-4 border-2 border-ink bg-cream p-4 hover:shadow-hard sm:grid-cols-[1fr_5rem_7rem_auto]"
+        className="group grid grid-cols-[1fr_auto] items-center gap-4 border-2 border-ink bg-cream p-4 hover:shadow-hard focus-visible:shadow-hard sm:grid-cols-[1fr_5rem_7rem_auto]"
       >
         <div className="min-w-0">
           <p className="truncate font-heading text-lg font-extrabold uppercase">{app.company}</p>
@@ -65,7 +66,7 @@ function ApplicationRow({ app }) {
         <span className={`hidden justify-self-start border-2 border-ink px-2 py-1 font-mono text-xs font-bold uppercase sm:inline ${status.cls}`}>
           {status.label}
         </span>
-        <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1" aria-hidden="true" />
+        <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 group-focus-visible:translate-x-1" aria-hidden="true" />
       </Link>
     </li>
   );
@@ -75,15 +76,22 @@ export default function DashboardPage() {
   const [applications, setApplications] = useState(null);
   const [error, setError] = useState('');
 
+  // `isCurrent` lets the effect ignore an answer that arrives after the page was left.
+  const load = useCallback((isCurrent = () => true) => {
+    setError('');
+    setApplications(null);
+    apiGet('/api/applications')
+      .then((data) => isCurrent() && setApplications(data.applications))
+      .catch((err) => isCurrent() && setError(errorMessage(err)));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/applications')
-      .then((data) => !cancelled && setApplications(data.applications))
-      .catch((err) => !cancelled && setError(errorMessage(err)));
+    load(() => !cancelled);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [load]);
 
   return (
     <>
@@ -94,15 +102,11 @@ export default function DashboardPage() {
         </Link>
       </PageHeader>
 
-      {error && (
-        <p role="alert" className="border-2 border-ink bg-alert p-4 font-mono text-sm">
-          {error}
-        </p>
-      )}
-      {!error && applications === null && <p className="font-mono text-sm">Loading…</p>}
+      {error && <ErrorBox message={`Could not load your applications. ${error}`} onRetry={() => load()} />}
+      {!error && applications === null && <Loading label="Loading your applications" />}
       {applications?.length === 0 && <EmptyState />}
       {applications?.length > 0 && (
-        <ul className="space-y-3">
+        <ul className="space-y-3" aria-label="Applications, newest first">
           {applications.map((app) => (
             <ApplicationRow key={app.id} app={app} />
           ))}

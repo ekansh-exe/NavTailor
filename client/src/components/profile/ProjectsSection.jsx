@@ -1,10 +1,12 @@
 import BulletsEditor from './BulletsEditor.jsx';
+import { EmptyNote } from '../ui/Status.jsx';
 import { Button, ItemCard, Section, TagInput, TextField } from './ui.jsx';
 import { LIMIT, newProject, newProjectBullet, removeAt, setAt } from './model.js';
 
 export default function ProjectsSection({ items, onChange }) {
   return (
     <Section title="Projects" tag={`${items.length}/${LIMIT.projects}`}>
+      {items.length === 0 && <EmptyNote>No projects yet. Side projects count, especially for a first job.</EmptyNote>}
       {items.map((project, i) => (
         <ItemCard
           key={project.id}
@@ -41,7 +43,8 @@ export default function ProjectsSection({ items, onChange }) {
           />
         </ItemCard>
       ))}
-      <Button onClick={() => onChange([...items, newProject()])} disabled={items.length >= LIMIT.projects}>
+      <Button
+        data-add onClick={() => onChange([...items, newProject()])} softDisabled={items.length >= LIMIT.projects}>
         + Add project
       </Button>
     </Section>

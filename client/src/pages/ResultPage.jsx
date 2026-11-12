@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { apiGet, apiPatch, apiPostForFile } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
+import { ErrorBox, Loading } from '../components/ui/Status.jsx';
 import GapReport from '../components/result/GapReport.jsx';
 import ChangeList from '../components/result/ChangeList.jsx';
 import PdfPanel from '../components/result/PdfPanel.jsx';
-import { applyDecisions, errorMessage, removeBullets, saveBlob, slug } from '../lib/tailoring.js';
+import { applyDecisions, removeBullets, saveBlob, slug } from '../lib/tailoring.js';
+import { errorMessage } from '../lib/errors.js';
 
 const STATUS_LABEL = { tailored: 'New', reviewed: 'Reviewed' };
 
@@ -15,6 +17,7 @@ export default function ResultPage() {
 
   const [application, setApplication] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0); // bump to retry a failed load
   const [decisions, setDecisions] = useState({});
   const [saving, setSaving] = useState(false);
   const [decisionError, setDecisionError] = useState('');
@@ -44,7 +47,7 @@ export default function ResultPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   // A blob: URL keeps its PDF in memory until revoked. When pdf changes (re-render) or the page
   // unmounts, this cleanup frees the previous one.
@@ -143,12 +146,13 @@ export default function ResultPage() {
   }
   if (loadError) {
     return (
-      <p role="alert" className="border-2 border-ink bg-alert p-4 font-mono text-sm">
-        {loadError}
-      </p>
+      <ErrorBox
+        message={`Could not load this application. ${loadError}`}
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
     );
   }
-  if (!application) return <p className="font-mono text-sm">Loading…</p>;
+  if (!application) return <Loading label="Loading your tailored resume" />;
 
   return (
     <div className="space-y-12">

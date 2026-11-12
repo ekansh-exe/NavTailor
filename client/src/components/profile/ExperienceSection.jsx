@@ -1,10 +1,12 @@
 import BulletsEditor from './BulletsEditor.jsx';
+import { EmptyNote } from '../ui/Status.jsx';
 import { Button, ItemCard, Section, TextField } from './ui.jsx';
 import { LIMIT, newExperience, newExperienceBullet, removeAt, setAt } from './model.js';
 
 export default function ExperienceSection({ items, onChange }) {
   return (
     <Section title="Experience" tag={`${items.length}/${LIMIT.experience}`}>
+      {items.length === 0 && <EmptyNote>No jobs yet. Add your first one, or import your resume from the top of the page.</EmptyNote>}
       {items.map((job, i) => (
         <ItemCard
           key={job.id}
@@ -41,7 +43,8 @@ export default function ExperienceSection({ items, onChange }) {
           />
         </ItemCard>
       ))}
-      <Button onClick={() => onChange([...items, newExperience()])} disabled={items.length >= LIMIT.experience}>
+      <Button
+        data-add onClick={() => onChange([...items, newExperience()])} softDisabled={items.length >= LIMIT.experience}>
         + Add job
       </Button>
     </Section>

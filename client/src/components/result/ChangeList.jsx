@@ -1,12 +1,15 @@
 import { Check, Lock, X } from 'lucide-react';
 import { BLOCK_REASON, bulletContext, usesRewrite } from '../../lib/tailoring.js';
+import { ErrorBox } from '../ui/Status.jsx';
 
+// aria-disabled (not disabled) while a choice is saving: the pressed button keeps keyboard focus,
+// so a keyboard user can go straight on to the next card.
 const TOGGLE =
-  'inline-flex cursor-pointer items-center gap-1 border-2 border-ink px-3 py-2 font-mono text-xs font-bold uppercase disabled:cursor-not-allowed disabled:opacity-50';
+  'inline-flex cursor-pointer items-center gap-1 border-2 border-ink px-3 py-2 font-mono text-xs font-bold uppercase aria-disabled:cursor-wait aria-disabled:opacity-60';
 
 function Column({ label, text, active }) {
   return (
-    <div className={`border-2 border-ink p-3 ${active ? 'bg-cream' : 'bg-cream text-ink/50'}`}>
+    <div className={`border-2 border-ink p-3 ${active ? 'bg-cream' : 'bg-cream text-ink/70'}`}>
       <span className="font-mono text-[10px] font-bold uppercase">
         {label}
         {active && ' · on resume'}
@@ -22,13 +25,13 @@ function ReviewCard({ change, context, accepted, disabled, onDecide }) {
     <li className="border-2 border-ink bg-cream p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <span className="font-mono text-xs uppercase">{context}</span>
-        <div className="flex gap-2" role="group" aria-label="Use this rewrite?">
+        <div className="flex gap-2" role="group" aria-label={`Rewrite for ${context || 'this bullet'}`}>
           <button
             type="button"
             aria-pressed={accepted}
-            disabled={disabled}
-            onClick={() => onDecide(change.itemId, true)}
-            className={`${TOGGLE} ${accepted ? 'bg-ink text-cream shadow-hard' : 'bg-cream hover:bg-ok'}`}
+            aria-disabled={disabled || undefined}
+            onClick={() => !disabled && onDecide(change.itemId, true)}
+            className={`${TOGGLE} ${accepted ? 'bg-ink text-cream shadow-hard' : 'bg-cream hover:bg-ok focus-visible:bg-ok'}`}
           >
             <Check size={14} strokeWidth={3} aria-hidden="true" />
             Accept
@@ -36,9 +39,9 @@ function ReviewCard({ change, context, accepted, disabled, onDecide }) {
           <button
             type="button"
             aria-pressed={!accepted}
-            disabled={disabled}
-            onClick={() => onDecide(change.itemId, false)}
-            className={`${TOGGLE} ${!accepted ? 'bg-ink text-cream shadow-hard' : 'bg-cream hover:bg-alert'}`}
+            aria-disabled={disabled || undefined}
+            onClick={() => !disabled && onDecide(change.itemId, false)}
+            className={`${TOGGLE} ${!accepted ? 'bg-ink text-cream shadow-hard' : 'bg-cream hover:bg-alert focus-visible:bg-alert'}`}
           >
             <X size={14} strokeWidth={3} aria-hidden="true" />
             Reject
@@ -94,18 +97,18 @@ export default function ChangeList({ changes, resume, decisions, saving, error, 
   return (
     <section aria-labelledby="changes-title">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <h3 id="changes-title" className="text-2xl">
+        <h2 id="changes-title" className="text-2xl">
           Changes
-        </h3>
-        <span className="font-mono text-xs uppercase" aria-live="polite">
+        </h2>
+        <span className="font-mono text-xs uppercase" role="status">
           {saving ? 'Saving…' : `${acceptedCount} of ${reviewable.length} rewrites accepted`}
         </span>
       </div>
 
       {error && (
-        <p role="alert" className="mb-4 border-2 border-ink bg-alert p-3 font-mono text-sm">
-          {error}
-        </p>
+        <div className="mb-4">
+          <ErrorBox message={error} />
+        </div>
       )}
 
       {reviewable.length === 0 && blocked.length === 0 ? (
