@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { User } from '../models/User.js';
 import { verifyGoogleCredential } from '../auth/google.js';
-import { setSessionCookie } from '../auth/session.js';
+import { clearSessionCookie, setSessionCookie } from '../auth/session.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 
 export const authRouter = Router();
 
@@ -52,4 +53,27 @@ authRouter.post('/google', async (req, res) => {
     console.error('Login failed:', err.message);
     return res.status(500).json({ error: 'Login failed' });
   }
+});
+
+// The JWT only proves "this is user id X". Load the real user from the database.
+// The query is scoped to req.user.id, which comes from the verified token.
+authRouter.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      // Valid token for a user that no longer exists: end the session.
+      clearSessionCookie(res);
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    return res.json({ user: toPublicUser(user) });
+  } catch (err) {
+    console.error('Loading current user failed:', err.message);
+    return res.status(500).json({ error: 'Could not load user' });
+  }
+});
+
+// Not protected: clearing a cookie is harmless and safe to repeat.
+authRouter.post('/logout', (req, res) => {
+  clearSessionCookie(res);
+  res.json({ ok: true });
 });
