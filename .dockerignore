@@ -1,0 +1,29 @@
+# Keep secrets, local builds and anything the image does not need out of the build context.
+# The context is what `docker build .` uploads; a file not sent cannot leak into an image layer.
+
+# Secrets: never in an image. The host injects environment variables at runtime.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Installed inside the image with npm ci, for the image's own platform.
+**/node_modules
+
+# Git history and local tooling.
+.git
+.gitignore
+.code-review-graph
+.claude
+CLAUDE.md
+**/*.log
+
+# Built inside the image (stage 1); a local build would be stale.
+client/dist
+
+# Tests are not part of the production image.
+server/test
+
+# Not needed to run.
+Dockerfile
+.dockerignore
+README.md
