@@ -82,3 +82,8 @@ export function apiUpload(path, file, fieldName = 'file') {
 export function apiPost(path, body) {
   return request(path, jsonBody('POST', body));
 }
+
+// DELETE answers 204 No Content: there is no body to parse, so this resolves to nothing.
+export async function apiDelete(path) {
+  await send(path, { method: 'DELETE' });
+}

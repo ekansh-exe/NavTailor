@@ -7,9 +7,10 @@
 @theme {
   --color-cream: #ffffe0;
   --color-ink: #111111;
-  /* Status colors, used only for the API health tag. */
+  /* Status colors: the API health tag and the application status badges. */
   --color-ok: #7be07b;
   --color-alert: #ff5c5c;
+  --color-pending: #ffd23f;
 
   --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
   --font-heading: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
