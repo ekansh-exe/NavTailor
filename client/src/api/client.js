@@ -3,7 +3,7 @@
 
 // credentials: 'include' tells the browser to send and accept cookies on the request.
 // The server uses it to read our session cookie and to set it after Google login.
-async function request(path, options = {}) {
+async function send(path, options = {}) {
   const res = await fetch(path, { credentials: 'include', ...options });
   if (!res.ok) {
     const err = new Error(`Request failed: ${res.status} ${res.statusText}`);
@@ -16,19 +16,37 @@ async function request(path, options = {}) {
     }
     throw err;
   }
-  return res.json();
+  return res;
 }
+
+async function request(path, options) {
+  return (await send(path, options)).json();
+}
+
+const jsonBody = (method, body) => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 export function apiGet(path) {
   return request(path);
 }
 
 export function apiPut(path, body) {
-  return request(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return request(path, jsonBody('PUT', body));
+}
+
+export function apiPatch(path, body) {
+  return request(path, jsonBody('PATCH', body));
+}
+
+// For routes that answer with a FILE (a PDF, a .tex), not JSON. Returns the bytes as a Blob plus the
+// response headers (the PDF route reports its page fit in headers). Errors still arrive as JSON and
+// throw like every other call.
+export async function apiPostForFile(path, body) {
+  const res = await send(path, jsonBody('POST', body));
+  return { blob: await res.blob(), headers: res.headers };
 }
 
 // Sends a file as multipart/form-data. We deliberately set NO Content-Type header:
@@ -41,9 +59,5 @@ export function apiUpload(path, file, fieldName = 'file') {
 }
 
 export function apiPost(path, body) {
-  return request(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return request(path, jsonBody('POST', body));
 }
