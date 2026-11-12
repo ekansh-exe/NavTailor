@@ -20,8 +20,9 @@ app.use(
   cors({
     origin: config.clientOrigin,
     credentials: true,
-    // Without this a browser on another port cannot read the PDF report headers (see routes/resume.js).
-    exposedHeaders: ['X-Resume-Pages', 'X-Resume-Dropped', 'X-Resume-Fit'],
+    // Without this a browser on another port cannot read the PDF report headers (see routes/resume.js)
+    // or how long to wait after a 429 (Retry-After).
+    exposedHeaders: ['X-Resume-Pages', 'X-Resume-Dropped', 'X-Resume-Fit', 'Retry-After'],
   }),
 );
 
